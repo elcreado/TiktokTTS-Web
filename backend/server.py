@@ -76,7 +76,7 @@ manager = ConnectionManager()
 
 # TikTok Live Integration
 from TikTokLive import TikTokLiveClient
-from TikTokLive.events import ConnectEvent, CommentEvent, DisconnectEvent, ViewerUpdateEvent
+from TikTokLive.events import ConnectEvent, CommentEvent, DisconnectEvent, UserStatsEvent
 
 class TikTokLiveBot:
     def __init__(self):
@@ -153,7 +153,7 @@ class TikTokLiveBot:
             await self.handle_chat_message(user, message)
         
         @self.client.on("viewer_count_update")
-        async def on_viewer_count_update(event: ViewerUpdateEvent):
+        async def on_viewer_count_update(event: UserStatsEvent):
             logger.info(f"👥 Espectadores: {event.viewer_count}")
             
             await manager.broadcast(json.dumps({
