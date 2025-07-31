@@ -36,11 +36,14 @@ function App() {
   
   // Constants
   const MAX_MESSAGES = 100; // Límite de mensajes para optimizar rendimiento
+  const MAX_TTS_QUEUE = 10; // Límite de mensajes en cola TTS para evitar acumulación excesiva
   
   // Refs
   const wsRef = useRef(null);
   const scrollAreaRef = useRef(null);
   const shouldAutoScroll = useRef(true);
+  const ttsQueue = useRef([]);
+  const isProcessingTTS = useRef(false);
 
   // TTS Setup
   const speak = (text, user) => {
