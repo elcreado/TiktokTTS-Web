@@ -1,6 +1,4 @@
-<file>
-      <absolute_file_name>/app/backend/config/settings.py</absolute_file_name>
-      <content">import os
+import os
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -29,5 +27,3 @@ class Settings:
     CORS_HEADERS = ["*"]
 
 settings = Settings()
-</content>
-    </file>
