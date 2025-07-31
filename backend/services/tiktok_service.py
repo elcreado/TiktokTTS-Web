@@ -169,6 +169,11 @@ class TikTokService:
         
         @self.client.on(ConnectEvent)
         async def on_connect(event):
+            # Check if we should still process connection events
+            if not self.client:
+                logger.info(f"🚫 [Handler {handler_id}] Ignoring connect event - client is None")
+                return
+                
             self.is_connected = True
             logger.info(f"✅ [SINGLE Handler {handler_id}] Successfully connected to live stream!")
             
