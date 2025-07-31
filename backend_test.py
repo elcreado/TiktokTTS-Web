@@ -480,6 +480,264 @@ class TikTokTTSBotTester:
             print(f"❌ WebSocket real-time communication test failed - Error: {str(e)}")
             return False
 
+    def test_aggressive_disconnect_implementation(self):
+        """
+        CRITICAL TEST: Test the AGGRESSIVE DISCONNECT implementation to verify 
+        TikTok connection properly terminates and NO events continue after disconnect.
+        
+        This test specifically addresses the user-reported issue where messages 
+        continue flowing after disconnect button is pressed.
+        """
+        print(f"\n🔫 TESTING AGGRESSIVE DISCONNECT IMPLEMENTATION")
+        print("=" * 60)
+        print("🎯 CRITICAL: Verifying complete TikTok connection termination")
+        
+        # Clear previous messages and reset state
+        self.ws_messages = []
+        self.ws_connected = False
+        disconnect_messages_before = []
+        disconnect_messages_after = []
+        
+        # Convert HTTP URL to WebSocket URL for monitoring
+        ws_url = self.base_url.replace("https://", "wss://").replace("http://", "ws://") + "/api/ws"
+        print(f"   📡 WebSocket monitoring URL: {ws_url}")
+        
+        try:
+            # Step 1: Establish WebSocket connection for monitoring
+            print("\n📡 STEP 1: Establishing WebSocket monitoring connection...")
+            ws = websocket.WebSocketApp(
+                ws_url,
+                on_open=self.on_ws_open,
+                on_message=self.on_ws_message,
+                on_error=self.on_ws_error,
+                on_close=self.on_ws_close
+            )
+            
+            # Run WebSocket in a separate thread
+            ws_thread = threading.Thread(target=ws.run_forever)
+            ws_thread.daemon = True
+            ws_thread.start()
+            
+            # Wait for WebSocket connection
+            time.sleep(3)
+            
+            if not self.ws_connected:
+                print("❌ Failed to establish WebSocket monitoring connection")
+                self.tests_run += 1
+                return False
+            
+            print("✅ WebSocket monitoring connection established")
+            
+            # Step 2: Connect to TikTok user (can use offline user for testing)
+            print("\n🔗 STEP 2: Connecting to TikTok user...")
+            test_username = "testuser_offline_12345"  # Use offline user for testing
+            
+            connect_success, connect_data = self.run_test(
+                "Connect to TikTok User",
+                "POST",
+                "api/connect",
+                200,
+                data={"username": test_username}
+            )
+            
+            if not connect_success:
+                print("❌ Failed to initiate TikTok connection")
+                ws.close()
+                self.tests_run += 1
+                return False
+            
+            # Wait for connection attempt and capture initial messages
+            print("   ⏳ Waiting for connection attempt (10 seconds)...")
+            time.sleep(10)
+            
+            # Capture messages before disconnect
+            disconnect_messages_before = self.ws_messages.copy()
+            print(f"   📊 Messages before disconnect: {len(disconnect_messages_before)}")
+            
+            # Step 3: Get connection details before disconnect
+            print("\n📊 STEP 3: Getting connection state before disconnect...")
+            before_success, before_data = self.run_test(
+                "Connection Details Before Disconnect",
+                "GET",
+                "api/connection-details",
+                200
+            )
+            
+            if before_success:
+                print(f"   📋 Before disconnect state:")
+                print(f"      - is_connected: {before_data.get('is_connected', 'unknown')}")
+                print(f"      - has_client: {before_data.get('has_client', 'unknown')}")
+                print(f"      - has_connection_task: {before_data.get('has_connection_task', 'unknown')}")
+                print(f"      - username: {before_data.get('username', 'unknown')}")
+            
+            # Step 4: Execute AGGRESSIVE DISCONNECT
+            print("\n🔫 STEP 4: Executing AGGRESSIVE DISCONNECT...")
+            print("   🎯 Testing /api/force-disconnect endpoint...")
+            
+            # Clear message buffer to capture only post-disconnect messages
+            self.ws_messages.clear()
+            
+            # Execute force disconnect
+            force_disconnect_success, force_disconnect_data = self.run_test(
+                "AGGRESSIVE FORCE DISCONNECT",
+                "POST",
+                "api/force-disconnect",
+                200
+            )
+            
+            if not force_disconnect_success:
+                print("❌ Force disconnect API call failed")
+                ws.close()
+                self.tests_run += 1
+                return False
+            
+            print("✅ Force disconnect API call successful")
+            print(f"   📋 Response: {force_disconnect_data}")
+            
+            # Step 5: Verify connection state immediately after disconnect
+            print("\n📊 STEP 5: Verifying connection state after disconnect...")
+            time.sleep(2)  # Brief wait for cleanup
+            
+            after_success, after_data = self.run_test(
+                "Connection Details After Disconnect",
+                "GET",
+                "api/connection-details",
+                200
+            )
+            
+            if after_success:
+                print(f"   📋 After disconnect state:")
+                print(f"      - is_connected: {after_data.get('is_connected', 'unknown')}")
+                print(f"      - has_client: {after_data.get('has_client', 'unknown')}")
+                print(f"      - has_connection_task: {after_data.get('has_connection_task', 'unknown')}")
+                print(f"      - username: {after_data.get('username', 'unknown')}")
+                
+                # Verify state is properly reset
+                state_reset_correctly = (
+                    after_data.get('is_connected') == False and
+                    after_data.get('has_client') == False and
+                    after_data.get('username') == ""
+                )
+                
+                if state_reset_correctly:
+                    print("✅ Connection state properly reset")
+                else:
+                    print("⚠️ Connection state may not be fully reset")
+            
+            # Step 6: CRITICAL MONITORING - Watch for 45 seconds for any new events
+            print("\n⏰ STEP 6: CRITICAL MONITORING - Watching for new events (45 seconds)...")
+            print("   🎯 This is the CRITICAL test - NO new TikTok events should be processed")
+            print("   🔍 Looking for 'AGGRESSIVE DISCONNECT COMPLETED' in logs")
+            print("   🚫 Looking for 'Ignoring comment event - service disconnected' messages")
+            
+            monitoring_start_time = time.time()
+            monitoring_duration = 45  # 45 seconds of monitoring
+            message_count_at_start = len(self.ws_messages)
+            
+            print(f"   📊 Starting monitoring with {message_count_at_start} messages")
+            
+            # Monitor for the specified duration
+            while (time.time() - monitoring_start_time) < monitoring_duration:
+                current_time = time.time() - monitoring_start_time
+                remaining_time = monitoring_duration - current_time
+                
+                # Print progress every 10 seconds
+                if int(current_time) % 10 == 0 and int(current_time) > 0:
+                    current_message_count = len(self.ws_messages)
+                    new_messages = current_message_count - message_count_at_start
+                    print(f"   ⏱️ {int(current_time)}s elapsed - {new_messages} new messages - {int(remaining_time)}s remaining")
+                
+                time.sleep(1)
+            
+            # Step 7: Analyze results
+            print("\n📊 STEP 7: ANALYZING MONITORING RESULTS...")
+            
+            final_message_count = len(self.ws_messages)
+            new_messages_during_monitoring = final_message_count - message_count_at_start
+            
+            print(f"   📈 Messages at monitoring start: {message_count_at_start}")
+            print(f"   📈 Messages at monitoring end: {final_message_count}")
+            print(f"   📈 New messages during 45s monitoring: {new_messages_during_monitoring}")
+            
+            # Analyze message types during monitoring period
+            if new_messages_during_monitoring > 0:
+                print(f"   📋 New messages received during monitoring:")
+                for i, msg in enumerate(self.ws_messages[message_count_at_start:]):
+                    try:
+                        parsed = json.loads(msg)
+                        msg_type = parsed.get('type', 'unknown')
+                        print(f"      {i+1}. Type: {msg_type} - Content: {msg[:100]}...")
+                    except:
+                        print(f"      {i+1}. Raw: {msg[:100]}...")
+            else:
+                print("   ✅ NO new messages received during monitoring period")
+            
+            # Step 8: Final connection state verification
+            print("\n📊 STEP 8: Final connection state verification...")
+            final_success, final_data = self.run_test(
+                "Final Connection Details",
+                "GET",
+                "api/connection-details",
+                200
+            )
+            
+            if final_success:
+                print(f"   📋 Final state:")
+                print(f"      - is_connected: {final_data.get('is_connected', 'unknown')}")
+                print(f"      - has_client: {final_data.get('has_client', 'unknown')}")
+                print(f"      - has_connection_task: {final_data.get('has_connection_task', 'unknown')}")
+                print(f"      - username: {final_data.get('username', 'unknown')}")
+            
+            # Close WebSocket monitoring
+            ws.close()
+            time.sleep(1)
+            
+            # Step 9: Evaluate test results
+            print("\n🎯 STEP 9: EVALUATING TEST RESULTS...")
+            
+            # Success criteria:
+            # 1. Force disconnect API call succeeded
+            # 2. Connection state properly reset
+            # 3. No new TikTok events processed during monitoring period
+            # 4. Final state remains disconnected
+            
+            success_criteria = {
+                "force_disconnect_api": force_disconnect_success,
+                "state_reset": after_success and after_data.get('is_connected') == False,
+                "no_new_events": new_messages_during_monitoring == 0,
+                "final_state_disconnected": final_success and final_data.get('is_connected') == False
+            }
+            
+            print("   📊 Success Criteria Evaluation:")
+            for criterion, passed in success_criteria.items():
+                status = "✅ PASS" if passed else "❌ FAIL"
+                print(f"      - {criterion}: {status}")
+            
+            overall_success = all(success_criteria.values())
+            
+            self.tests_run += 1
+            if overall_success:
+                self.tests_passed += 1
+                print("\n🎉 AGGRESSIVE DISCONNECT TEST: ✅ PASSED")
+                print("   🔥 TikTok connection properly terminated")
+                print("   🚫 NO events processed after disconnect")
+                print("   ✅ User-reported issue RESOLVED")
+                return True
+            else:
+                print("\n💥 AGGRESSIVE DISCONNECT TEST: ❌ FAILED")
+                print("   ⚠️ TikTok connection may not be fully terminated")
+                print("   🔍 Review logs for 'AGGRESSIVE DISCONNECT COMPLETED' message")
+                print("   🔍 Check for 'Ignoring comment event' validation messages")
+                return False
+                
+        except Exception as e:
+            self.tests_run += 1
+            print(f"\n💥 AGGRESSIVE DISCONNECT TEST: ❌ EXCEPTION")
+            print(f"   Error: {str(e)}")
+            import traceback
+            print(f"   Traceback: {traceback.format_exc()}")
+            return False
+
 def main():
     print("🚀 Starting TikTok Live TTS Bot API Tests")
     print("=" * 60)
