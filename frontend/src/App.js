@@ -336,31 +336,6 @@ function App() {
     console.log('✅ TTS queue cleared and speech stopped');
   };
 
-  // Enhanced TTS test function with better diagnostics
-  const testTTS = async () => {
-    if (!ttsEnabled) return;
-    
-    console.log('🧪 Testing TTS functionality...');
-    
-    // Clear any existing speech first
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
-    
-    // Test message
-    const testMessage = "¡Hola! Esto es una prueba del sistema TTS.";
-    const testUser = "Sistema";
-    
-    try {
-      await speak(testMessage, testUser);
-      console.log('✅ TTS test completed successfully');
-      toast.success('Prueba TTS completada');
-    } catch (error) {
-      console.error('❌ TTS test failed:', error);
-      toast.error('Error en prueba TTS: ' + error.message);
-    }
-  };
-
   // WebSocket Setup
   const connectWebSocket = () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
