@@ -38,7 +38,7 @@ function App() {
   
   // Constants
   const MAX_MESSAGES = 100; // Límite de mensajes para optimizar rendimiento
-  const MAX_TTS_QUEUE = 10; // Límite de mensajes en cola TTS para evitar acumulación excesiva
+  const MAX_TTS_QUEUE = 1; // Máximo 1 mensaje en cola (más el que se está reproduciendo) para evitar retrasos
   
   // Refs
   const wsRef = useRef(null);
