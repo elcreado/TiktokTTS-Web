@@ -439,18 +439,48 @@ function App() {
           <div className="lg:col-span-2">
             <Card className="bg-black/40 backdrop-blur-sm border-white/10 h-[600px] flex flex-col">
               <CardHeader className="pb-4">
-                <CardTitle className="text-white flex items-center space-x-2">
-                  <MessageCircle className="w-5 h-5" />
-                  <span>Chat en Vivo</span>
-                  {isConnected && (
-                    <Badge variant="default" className="ml-2">
-                      @{currentUsername}
-                    </Badge>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-white flex items-center space-x-2">
+                      <MessageCircle className="w-5 h-5" />
+                      <span>Chat en Vivo</span>
+                      {isConnected && (
+                        <Badge variant="default" className="ml-2">
+                          @{currentUsername}
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription className="text-gray-300">
+                      Mensajes en tiempo real de TikTok Live {chatMessages.length > 0 && `(${chatMessages.length} mensajes)`}
+                    </CardDescription>
+                  </div>
+                  
+                  {chatMessages.length > 5 && (
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          shouldAutoScroll.current = !shouldAutoScroll.current;
+                          if (shouldAutoScroll.current) {
+                            scrollToBottom();
+                          }
+                        }}
+                        className="border-white/20 text-white hover:bg-white/10 text-xs"
+                      >
+                        {shouldAutoScroll.current ? '⏸️ Pausar scroll' : '▶️ Auto scroll'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setChatMessages([])}
+                        className="border-white/20 text-white hover:bg-white/10 text-xs"
+                      >
+                        🗑️ Limpiar
+                      </Button>
+                    </div>
                   )}
-                </CardTitle>
-                <CardDescription className="text-gray-300">
-                  Mensajes en tiempo real de TikTok Live {chatMessages.length > 0 && `(${chatMessages.length} mensajes)`}
-                </CardDescription>
+                </div>
               </CardHeader>
               
               <CardContent className="flex-1 overflow-hidden p-0">
