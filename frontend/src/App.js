@@ -255,8 +255,8 @@ function App() {
     
     try {
       while (ttsQueue.current.length > 0 && ttsEnabled) {
-        // Take the first message from queue (FIFO - First In, First Out)
-        const message = ttsQueue.current.shift(); // Use shift() to get the first message
+        // Take the first message from queue (FIFO - First In, First Out) 
+        const message = ttsQueue.current.shift();
         setTtsQueueLength(ttsQueue.current.length);
         
         console.log(`🎤 Processing TTS message ${message.id}: "${message.text}" by ${message.user}`);
@@ -264,14 +264,16 @@ function App() {
         
         try {
           // Wait for the current message to complete FULLY before proceeding
+          console.log(`⏳ Starting TTS for message ${message.id}...`);
           await speak(message.text, message.user);
           console.log(`✅ Completed TTS message ${message.id}: "${message.text}" by ${message.user}`);
           
-          // Small pause after completion
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Shorter pause after completion to improve responsiveness
+          await new Promise(resolve => setTimeout(resolve, 200));
           
         } catch (error) {
           console.error(`❌ Error processing TTS message ${message.id}:`, error);
+          // Continue with next message even if current one fails
         }
         
         // Check if TTS was disabled during processing
@@ -298,7 +300,7 @@ function App() {
       // This handles cases where new messages arrived while we were processing
       if (ttsQueue.current.length > 0 && ttsEnabled) {
         console.log('🔄 More messages in queue, continuing...');
-        setTimeout(() => processTTSQueue(), 200);
+        setTimeout(() => processTTSQueue(), 100); // Reduced delay for better responsiveness
       }
     }
   };
