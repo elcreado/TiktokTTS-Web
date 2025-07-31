@@ -183,6 +183,11 @@ class TikTokService:
         @self.client.on(CommentEvent)
         async def on_comment(event):
             try:
+                # CRITICAL FIX: Check if we should still process events
+                if not self.is_connected or not self.client:
+                    logger.info(f"🚫 [Handler {handler_id}] Ignoring comment event - service disconnected")
+                    return
+                
                 logger.info(f"🔍 [SINGLE Handler {handler_id}] Raw comment event received: {type(event)}")
                 
                 # Extract user info safely
