@@ -88,34 +88,19 @@ class TikTokLiveBot:
             
             # Get SING_API_KEY from environment
             sing_api_key = os.environ.get('SING_API_KEY', '')
+            logger.info(f"Using SING_API_KEY: {sing_api_key[:20]}..." if sing_api_key else "No SING_API_KEY found")
             
-            # Initialize TikTok Live client with enhanced configuration
-            try:
-                # Try with advanced configuration first
-                self.client = TikTokLiveClient(
-                    unique_id=clean_username,
-                    web_client_options={
-                        'signApiKey': sing_api_key,
-                        'fetchRoomInfoOnConnect': True,
-                        'enableExtendedGiftInfo': True,
-                        'requestPollingIntervalMs': 2000,
-                        'headers': {
-                            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
-                        }
-                    },
-                    process_initial_data=False,
-                    enable_extended_gift_info=True,
-                    polling_interval_ms=2000
-                )
-            except Exception as config_error:
-                logger.warning(f"Advanced config failed, trying basic config: {config_error}")
-                # Fallback to basic configuration
-                self.client = TikTokLiveClient(
-                    unique_id=clean_username,
-                    process_initial_data=False,
-                    enable_extended_gift_info=True,
-                    polling_interval_ms=2000
-                )
+            # Initialize TikTok Live client with minimal valid configuration
+            self.client = TikTokLiveClient(
+                unique_id=clean_username,
+                process_initial_data=False
+            )
+            
+            # Add custom headers if the client supports it
+            if hasattr(self.client, 'set_headers'):
+                self.client.set_headers({
+                    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
+                })
             
             # Set up event handlers
             self.setup_event_handlers()
