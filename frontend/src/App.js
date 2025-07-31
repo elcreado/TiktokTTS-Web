@@ -190,11 +190,22 @@ function App() {
     }
   };
 
-  // Clear TTS queue when TTS is disabled
+  // Clear TTS queue when TTS is disabled - Improved version
   const clearTTSQueue = () => {
+    console.log('Clearing TTS queue and stopping all speech...');
+    
+    // Clear the queue
     ttsQueue.current = [];
-    window.speechSynthesis.cancel();
+    
+    // Cancel any ongoing speech
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    
+    // Reset processing flag
     isProcessingTTS.current = false;
+    
+    console.log('TTS queue cleared and speech stopped');
   };
 
   // WebSocket Setup
@@ -326,6 +337,7 @@ function App() {
     }
   };
 
+  // Enhanced TTS toggle function
   const toggleTTS = async () => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/toggle-tts`, {
@@ -333,9 +345,15 @@ function App() {
       });
 
       if (response.ok) {
-        // If TTS is being disabled, clear the queue
-        if (ttsEnabled) {
+        const data = await response.json();
+        const newTTSState = data.tts_enabled;
+        
+        // If TTS is being disabled, clear the queue immediately
+        if (!newTTSState) {
           clearTTSQueue();
+          toast.info('TTS desactivado - Cola de mensajes limpiada');
+        } else {
+          toast.info('TTS activado');
         }
       } else {
         toast.error('Error al cambiar TTS');
