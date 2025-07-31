@@ -305,7 +305,7 @@ function App() {
     }
   };
 
-  // Clear TTS queue when TTS is disabled - Enhanced version
+  // Enhanced Clear TTS queue when TTS is disabled
   const clearTTSQueue = () => {
     console.log('🧹 Clearing TTS queue and stopping all speech...');
     
@@ -313,9 +313,20 @@ function App() {
     ttsQueue.current = [];
     setTtsQueueLength(0);
     
-    // Cancel any ongoing speech only when explicitly clearing
+    // Aggressive cancellation of any ongoing speech
     if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
+      try {
+        window.speechSynthesis.cancel();
+        // Wait a bit and cancel again to ensure it's really stopped
+        setTimeout(() => {
+          if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+            console.log('🧹 Secondary speech cancellation performed');
+          }
+        }, 100);
+      } catch (error) {
+        console.warn('Error cancelling speech synthesis:', error);
+      }
     }
     
     // Reset processing flags
@@ -323,6 +334,31 @@ function App() {
     setIsProcessingTTSState(false);
     
     console.log('✅ TTS queue cleared and speech stopped');
+  };
+
+  // Enhanced TTS test function with better diagnostics
+  const testTTS = async () => {
+    if (!ttsEnabled) return;
+    
+    console.log('🧪 Testing TTS functionality...');
+    
+    // Clear any existing speech first
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    
+    // Test message
+    const testMessage = "¡Hola! Esto es una prueba del sistema TTS.";
+    const testUser = "Sistema";
+    
+    try {
+      await speak(testMessage, testUser);
+      console.log('✅ TTS test completed successfully');
+      toast.success('Prueba TTS completada');
+    } catch (error) {
+      console.error('❌ TTS test failed:', error);
+      toast.error('Error en prueba TTS: ' + error.message);
+    }
   };
 
   // WebSocket Setup
