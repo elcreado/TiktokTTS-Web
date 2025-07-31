@@ -123,37 +123,28 @@ class TikTokLiveBot:
         """Set up all TikTok Live event handlers"""
         
         @self.client.on("connect")
-        async def on_connect(event: ConnectEvent):
+        async def on_connect(event):
             self.is_connected = True
-            logger.info(f"Successfully connected to @{event.unique_id}'s live stream!")
+            logger.info(f"Successfully connected to live stream!")
             
             await manager.broadcast(json.dumps({
                 "type": "connection_status",
                 "connected": True,
-                "username": event.unique_id,
+                "username": getattr(event, 'unique_id', self.username),
                 "timestamp": datetime.now().isoformat()
             }))
         
         @self.client.on("comment")
-        async def on_comment(event: CommentEvent):
-            user = event.user.nickname if hasattr(event, 'user') and event.user else "Usuario Anónimo"
-            message = event.comment
+        async def on_comment(event):
+            user = getattr(event, 'user', None)
+            user_name = getattr(user, 'nickname', 'Anonymous User') if user else "Anonymous User"
+            message = getattr(event, 'comment', 'No message')
             
-            logger.info(f"💬 {user}: {message}")
-            await self.handle_chat_message(user, message)
-        
-        @self.client.on("viewer_count_update")
-        async def on_viewer_count_update(event: UserStatsEvent):
-            logger.info(f"👥 Espectadores: {event.viewer_count}")
-            
-            await manager.broadcast(json.dumps({
-                "type": "viewer_count",
-                "count": event.viewer_count,
-                "timestamp": datetime.now().isoformat()
-            }))
+            logger.info(f"💬 {user_name}: {message}")
+            await self.handle_chat_message(user_name, message)
         
         @self.client.on("disconnect")
-        async def on_disconnect(event: DisconnectEvent):
+        async def on_disconnect(event):
             self.is_connected = False
             logger.info("Disconnected from TikTok live stream")
             
