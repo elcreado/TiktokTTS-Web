@@ -241,52 +241,6 @@ class TikTokLiveBot:
             }))
         
         logger.info(f"✅ Event handlers setup complete with ID: {handler_id}")
-        
-        # Note: String-based event handlers cause 'str' object has no attribute 'get_type' error in TikTokLive 6.5.2
-        # Only use event class-based handlers like CommentEvent, ConnectEvent, etc.
-        # Commenting out string-based handlers until library issue is resolved
-        # @self.client.on("comment")
-        # async def on_comment_string(event):
-        #     try:
-        #         logger.info(f"🎯 String-based comment event: {type(event)}")
-        #         logger.info(f"🎯 Event: {event}")
-        #         await self.handle_chat_message("Usuario (String Event)", str(event))
-        #     except Exception as e:
-        #         logger.error(f"💥 Error in string comment handler: {e}")
-        
-        # @self.client.on("live_comment")
-        # async def on_live_comment(event):
-        #     try:
-        #         logger.info(f"📝 Live comment event: {type(event)}")
-        #         logger.info(f"📝 Event: {event}")
-        #         await self.handle_chat_message("Usuario (Live Comment)", str(event))
-        #     except Exception as e:
-        #         logger.error(f"💥 Error in live comment handler: {e}")
-        
-        @self.client.on(DisconnectEvent)
-        async def on_disconnect(event):
-            self.is_connected = False
-            logger.info("❌ Disconnected from TikTok live stream")
-            
-            await manager.broadcast(json.dumps({
-                "type": "connection_status",
-                "connected": False,
-                "username": "",
-                "timestamp": datetime.now().isoformat()
-            }))
-        
-        # Note: Wildcard event handler ("*") causes 'str' object has no attribute 'get_type' error in TikTokLive 6.5.2
-        # Commenting out until library issue is resolved
-        # @self.client.on("*")
-        # async def on_any_event(event_name, event_data=None):
-        #     if event_name not in ['connect', 'disconnect']:
-        #         logger.info(f"🌟 Any event captured: {event_name} - Type: {type(event_data) if event_data else 'None'}")
-        #         if 'comment' in event_name.lower() or 'message' in event_name.lower():
-        #             logger.info(f"🌟 Potential message event: {event_name} - {event_data}")
-        #             try:
-        #                 await self.handle_chat_message(f"Usuario ({event_name})", str(event_data))
-        #             except Exception as e:
-        #                 logger.error(f"💥 Error handling any event: {e}")
     
     async def start_client(self):
         """Start the TikTok Live client"""
