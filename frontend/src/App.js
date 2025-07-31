@@ -125,6 +125,7 @@ function App() {
     // Add to queue but limit size to prevent excessive accumulation
     if (ttsQueue.current.length < MAX_TTS_QUEUE) {
       ttsQueue.current.push(messageData);
+      setTtsQueueLength(ttsQueue.current.length);
       console.log(`Added to TTS queue: "${text}" by ${user} (Queue length: ${ttsQueue.current.length})`);
       
       // Start processing if not already running
@@ -136,6 +137,7 @@ function App() {
       // Remove oldest message and add new one
       ttsQueue.current.shift();
       ttsQueue.current.push(messageData);
+      setTtsQueueLength(ttsQueue.current.length);
     }
   };
 
@@ -147,15 +149,18 @@ function App() {
     
     if (ttsQueue.current.length === 0) {
       console.log('TTS queue is empty');
+      setIsProcessingTTSState(false);
       return;
     }
     
     console.log(`Starting TTS queue processing with ${ttsQueue.current.length} messages`);
     isProcessingTTS.current = true;
+    setIsProcessingTTSState(true);
     
     try {
       while (ttsQueue.current.length > 0 && ttsEnabled) {
         const message = ttsQueue.current.shift();
+        setTtsQueueLength(ttsQueue.current.length);
         
         console.log(`Processing TTS message ${message.id}: "${message.text}" by ${message.user}`);
         
@@ -182,6 +187,8 @@ function App() {
       console.error('Error in TTS queue processing:', error);
     } finally {
       isProcessingTTS.current = false;
+      setIsProcessingTTSState(false);
+      setTtsQueueLength(ttsQueue.current.length);
       console.log(`TTS queue processing finished. Remaining messages: ${ttsQueue.current.length}`);
       
       // If there are still messages and TTS is enabled, continue processing
