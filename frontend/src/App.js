@@ -47,14 +47,11 @@ function App() {
   const ttsQueue = useRef([]);
   const isProcessingTTS = useRef(false);
 
-  // TTS Setup with Improved Queue System
+  // TTS Setup with Improved Sequential Processing (Latest Message Priority)
   const speak = (text, user) => {
     if (!ttsEnabled || !window.speechSynthesis) return Promise.resolve();
     
     return new Promise((resolve) => {
-      // Cancel any ongoing speech to prevent overlap
-      window.speechSynthesis.cancel();
-      
       const utterance = new SpeechSynthesisUtterance(`${user} dice: ${text}`);
       utterance.lang = 'es-ES'; // Spanish language
       utterance.rate = 0.9;
@@ -71,7 +68,7 @@ function App() {
         utterance.voice = spanishVoice;
       }
       
-      // Set up event handlers for more reliable completion detection
+      // Set up event handlers for reliable completion detection
       let resolved = false;
       
       const resolveOnce = () => {
@@ -81,27 +78,30 @@ function App() {
         }
       };
       
+      // Handle completion and errors
       utterance.onend = resolveOnce;
       utterance.onerror = (error) => {
         console.warn('TTS error:', error);
         resolveOnce();
       };
       
-      // Fallback timeout to prevent hanging
+      // Fallback timeout to prevent hanging (but generous to allow full completion)
       const timeout = setTimeout(() => {
         if (!resolved) {
-          console.warn('TTS timeout, forcing completion');
-          window.speechSynthesis.cancel();
+          console.warn('TTS timeout reached, but may still be playing');
           resolveOnce();
         }
-      }, Math.max(text.length * 100, 3000)); // Dynamic timeout based on text length
+      }, Math.max(text.length * 120, 5000)); // Generous timeout for full message
       
+      // Clear timeout when speech ends naturally
+      const originalOnEnd = utterance.onend;
       utterance.onend = () => {
         clearTimeout(timeout);
-        resolveOnce();
+        if (originalOnEnd) originalOnEnd();
       };
       
       try {
+        console.log(`🎤 Starting TTS: "${text}" by ${user}`);
         window.speechSynthesis.speak(utterance);
       } catch (error) {
         console.error('Error speaking utterance:', error);
@@ -111,7 +111,7 @@ function App() {
     });
   };
 
-  // Improved TTS Queue Management
+  // Modified TTS Queue Management - Latest Message Priority
   const addToTTSQueue = (text, user) => {
     if (!ttsEnabled) return;
     
@@ -119,82 +119,86 @@ function App() {
       text, 
       user, 
       timestamp: Date.now(),
-      id: Date.now() + Math.random() // Unique ID for tracking
+      id: Date.now() + Math.random()
     };
     
-    // Add to queue but limit size to prevent excessive accumulation
-    if (ttsQueue.current.length < MAX_TTS_QUEUE) {
-      ttsQueue.current.push(messageData);
-      setTtsQueueLength(ttsQueue.current.length);
-      console.log(`Added to TTS queue: "${text}" by ${user} (Queue length: ${ttsQueue.current.length})`);
-      
-      // Start processing if not already running
-      if (!isProcessingTTS.current) {
-        processTTSQueue();
-      }
+    // If currently processing, just replace the queue with the latest message
+    // This ensures we always play the most recent message after current one finishes
+    if (isProcessingTTS.current) {
+      console.log(`🎤 TTS is playing, replacing queue with latest message: "${text}" by ${user}`);
+      ttsQueue.current = [messageData]; // Replace entire queue with just the latest message
+      setTtsQueueLength(1);
     } else {
-      console.warn('TTS queue full, discarding oldest message');
-      // Remove oldest message and add new one
-      ttsQueue.current.shift();
-      ttsQueue.current.push(messageData);
-      setTtsQueueLength(ttsQueue.current.length);
+      // If not processing, clear queue and add this message, then start processing
+      console.log(`🎤 Adding message to empty TTS queue: "${text}" by ${user}`);
+      ttsQueue.current = [messageData];
+      setTtsQueueLength(1);
+      processTTSQueue();
     }
   };
 
   const processTTSQueue = async () => {
+    // Prevent multiple concurrent processing
     if (isProcessingTTS.current) {
-      console.log('TTS queue already processing, skipping...');
+      console.log('🎤 TTS queue already processing, skipping...');
       return;
     }
     
     if (ttsQueue.current.length === 0) {
-      console.log('TTS queue is empty');
+      console.log('🎤 TTS queue is empty');
       setIsProcessingTTSState(false);
       return;
     }
     
-    console.log(`Starting TTS queue processing with ${ttsQueue.current.length} messages`);
+    console.log(`🎤 Starting TTS processing with ${ttsQueue.current.length} message(s)`);
     isProcessingTTS.current = true;
     setIsProcessingTTSState(true);
     
     try {
       while (ttsQueue.current.length > 0 && ttsEnabled) {
-        const message = ttsQueue.current.shift();
+        // Always take the LATEST message (last in queue)
+        const message = ttsQueue.current.pop(); // Use pop() to get the latest message
         setTtsQueueLength(ttsQueue.current.length);
         
-        console.log(`Processing TTS message ${message.id}: "${message.text}" by ${message.user}`);
+        console.log(`🎤 Processing LATEST TTS message ${message.id}: "${message.text}" by ${message.user}`);
         
         try {
-          // Wait for the current message to complete before proceeding
+          // Wait for the current message to complete FULLY before proceeding
           await speak(message.text, message.user);
-          console.log(`Completed TTS message ${message.id}`);
+          console.log(`✅ Completed TTS message ${message.id}`);
           
-          // Add a pause between messages for better listening experience
-          await new Promise(resolve => setTimeout(resolve, 800));
+          // Small pause after completion
+          await new Promise(resolve => setTimeout(resolve, 500));
           
         } catch (error) {
-          console.error(`Error processing TTS message ${message.id}:`, error);
-          // Continue with next message even if current one fails
+          console.error(`❌ Error processing TTS message ${message.id}:`, error);
         }
         
         // Check if TTS was disabled during processing
         if (!ttsEnabled) {
-          console.log('TTS disabled during processing, stopping queue');
+          console.log('🔇 TTS disabled during processing, stopping queue');
           break;
+        }
+        
+        // After processing one message, check if new messages arrived
+        // If they did, we'll process the latest one in the next iteration
+        if (ttsQueue.current.length > 0) {
+          console.log(`📬 ${ttsQueue.current.length} new message(s) arrived, will process the latest one`);
         }
       }
     } catch (error) {
-      console.error('Error in TTS queue processing:', error);
+      console.error('❌ Error in TTS queue processing:', error);
     } finally {
       isProcessingTTS.current = false;
       setIsProcessingTTSState(false);
       setTtsQueueLength(ttsQueue.current.length);
-      console.log(`TTS queue processing finished. Remaining messages: ${ttsQueue.current.length}`);
+      console.log(`🏁 TTS processing finished. Remaining messages: ${ttsQueue.current.length}`);
       
       // If there are still messages and TTS is enabled, continue processing
+      // This handles cases where new messages arrived while we were finishing
       if (ttsQueue.current.length > 0 && ttsEnabled) {
-        console.log('More messages in queue, continuing processing...');
-        setTimeout(() => processTTSQueue(), 100);
+        console.log('🔄 More messages in queue, continuing with latest message...');
+        setTimeout(() => processTTSQueue(), 200);
       }
     }
   };
