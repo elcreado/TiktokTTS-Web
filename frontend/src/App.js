@@ -47,31 +47,87 @@ function App() {
   const ttsQueue = useRef([]);
   const isProcessingTTS = useRef(false);
 
-  // TTS Setup with Improved Sequential Processing
-  const speak = (text, user) => {
-    if (!ttsEnabled || !window.speechSynthesis) return Promise.resolve();
+  // Enhanced TTS Setup with Robust Error Handling and Browser API Fix
+  const speak = async (text, user) => {
+    if (!ttsEnabled || !window.speechSynthesis) return;
     
-    return new Promise((resolve) => {
+    // Check if Speech Synthesis is available and working
+    if (!window.speechSynthesis || window.speechSynthesis.speaking) {
+      console.warn('⚠️ Speech Synthesis unavailable or already speaking');
+      return;
+    }
+
+    const maxRetries = 2;
+    let retryCount = 0;
+    
+    const attemptSpeak = () => {
+      return new Promise((resolve) => {
+        // Cancel any pending speech to prevent conflicts
+        try {
+          window.speechSynthesis.cancel();
+          // Small delay to ensure cancellation completes
+          setTimeout(() => {
+            performSpeak(resolve);
+          }, 100);
+        } catch (e) {
+          console.warn('Error cancelling speech:', e);
+          performSpeak(resolve);
+        }
+      });
+    };
+
+    const performSpeak = (resolve) => {
       const utterance = new SpeechSynthesisUtterance(`${user} dice: ${text}`);
-      utterance.lang = 'es-ES'; // Spanish language
+      utterance.lang = 'es-ES';
       utterance.rate = 0.9;
       utterance.pitch = 1;
       utterance.volume = 0.8;
       
-      // Get available voices and prefer Spanish ones
-      const voices = window.speechSynthesis.getVoices();
-      const spanishVoice = voices.find(voice => 
-        voice.lang.includes('es') || voice.name.includes('Spanish')
-      );
-      
-      if (spanishVoice) {
-        utterance.voice = spanishVoice;
+      // Enhanced voice selection with better fallbacks
+      const loadVoicesAndSpeak = () => {
+        const voices = window.speechSynthesis.getVoices();
+        console.log(`🔍 Available voices: ${voices.length}`);
+        
+        // Try multiple Spanish voice patterns
+        const spanishVoice = voices.find(voice => 
+          voice.lang.includes('es-ES') || 
+          voice.lang.includes('es-MX') || 
+          voice.lang.includes('es') ||
+          voice.name.toLowerCase().includes('spanish') ||
+          voice.name.toLowerCase().includes('español')
+        );
+        
+        if (spanishVoice) {
+          utterance.voice = spanishVoice;
+          console.log(`🎯 Selected voice: ${spanishVoice.name} (${spanishVoice.lang})`);
+        } else {
+          console.warn('⚠️ No Spanish voice found, using default');
+        }
+        
+        initiateSpeak(resolve);
+      };
+
+      // Load voices if not already loaded
+      if (window.speechSynthesis.getVoices().length === 0) {
+        window.speechSynthesis.addEventListener('voiceschanged', loadVoicesAndSpeak, { once: true });
+        // Fallback if voiceschanged doesn't fire
+        setTimeout(loadVoicesAndSpeak, 100);
+      } else {
+        loadVoicesAndSpeak();
       }
-      
-      // Simple event handlers to prevent duplication
+    };
+
+    const initiateSpeak = (resolve) => {
+      const utterance = new SpeechSynthesisUtterance(`${user} dice: ${text}`);
+      utterance.lang = 'es-ES';
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.volume = 0.8;
+
       let hasResolved = false;
+      let speechStarted = false;
       
-      const handleEnd = () => {
+      const handleSuccess = () => {
         if (!hasResolved) {
           hasResolved = true;
           console.log(`✅ TTS completed: "${text}" by ${user}`);
@@ -82,28 +138,50 @@ function App() {
       const handleError = (error) => {
         if (!hasResolved) {
           hasResolved = true;
-          console.warn('TTS error:', error);
-          resolve();
+          console.error(`❌ TTS error (attempt ${retryCount + 1}):`, error);
+          
+          // Retry logic for browser API failures
+          if (retryCount < maxRetries && error.error !== 'interrupted') {
+            retryCount++;
+            console.log(`🔄 Retrying TTS (attempt ${retryCount + 1}/${maxRetries + 1})`);
+            setTimeout(() => {
+              attemptSpeak().then(resolve);
+            }, 500);
+          } else {
+            console.warn('⚠️ TTS failed after retries, continuing...');
+            resolve();
+          }
         }
       };
       
-      utterance.onend = handleEnd;
+      // Event handlers
+      utterance.onstart = () => {
+        speechStarted = true;
+        console.log(`🎤 TTS started: "${text}" by ${user}`);
+      };
+      
+      utterance.onend = handleSuccess;
       utterance.onerror = handleError;
       
-      // Safety timeout to prevent hanging
+      // Enhanced timeout with speech detection
       const timeout = setTimeout(() => {
         if (!hasResolved) {
           hasResolved = true;
-          console.warn('TTS timeout reached, resolving...');
-          resolve();
+          if (speechStarted) {
+            console.log(`⏰ TTS timeout after speech started: "${text}" by ${user}`);
+            resolve();
+          } else {
+            console.warn(`⏰ TTS timeout without speech start: "${text}" by ${user}`);
+            handleError({ error: 'timeout' });
+          }
         }
-      }, Math.max(text.length * 100, 3000)); // Adjusted timeout
+      }, Math.max(text.length * 100, 5000)); // Increased timeout
       
       try {
-        console.log(`🎤 Starting TTS: "${text}" by ${user}`);
+        console.log(`🎤 Initiating TTS: "${text}" by ${user} (attempt ${retryCount + 1})`);
         window.speechSynthesis.speak(utterance);
         
-        // Clear timeout when speech ends naturally
+        // Clear timeout on successful completion
         utterance.addEventListener('end', () => {
           clearTimeout(timeout);
         });
@@ -112,7 +190,10 @@ function App() {
         clearTimeout(timeout);
         handleError(error);
       }
-    });
+    };
+
+    // Start the speaking process
+    return await attemptSpeak();
   };
 
   // Smart TTS Queue Management - Maximum 2 messages (1 playing + 1 waiting)
