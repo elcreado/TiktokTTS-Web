@@ -122,7 +122,7 @@ class TikTokLiveBot:
     def setup_event_handlers(self):
         """Set up all TikTok Live event handlers"""
         
-        @self.client.on("connect")
+        @self.client.on(ConnectEvent)
         async def on_connect(event):
             self.is_connected = True
             logger.info(f"Successfully connected to live stream!")
@@ -134,7 +134,7 @@ class TikTokLiveBot:
                 "timestamp": datetime.now().isoformat()
             }))
         
-        @self.client.on("comment")
+        @self.client.on(CommentEvent)
         async def on_comment(event):
             user = getattr(event, 'user', None)
             user_name = getattr(user, 'nickname', 'Anonymous User') if user else "Anonymous User"
@@ -143,7 +143,7 @@ class TikTokLiveBot:
             logger.info(f"💬 {user_name}: {message}")
             await self.handle_chat_message(user_name, message)
         
-        @self.client.on("disconnect")
+        @self.client.on(DisconnectEvent)
         async def on_disconnect(event):
             self.is_connected = False
             logger.info("Disconnected from TikTok live stream")
