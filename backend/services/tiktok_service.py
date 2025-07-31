@@ -1,6 +1,4 @@
-<file>
-      <absolute_file_name>/app/backend/services/tiktok_service.py</absolute_file_name>
-      <content">import asyncio
+import asyncio
 import json
 import logging
 from datetime import datetime
@@ -372,5 +370,3 @@ class TikTokService:
 
 # Global TikTok service instance
 tiktok_service = TikTokService()
-</content>
-    </file>
