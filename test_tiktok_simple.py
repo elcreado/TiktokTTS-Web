@@ -15,18 +15,18 @@ async def test_tiktok_connection():
         # Create client
         client = TikTokLiveClient(unique_id="charlidamelio")
         
-        # Set up basic event handlers
-        @client.on("connect")
+        # Set up basic event handlers using event classes
+        @client.on(ConnectEvent)
         async def on_connect(event):
             logger.info(f"Connected successfully!")
             print(f"Event type: {type(event)}")
             print(f"Event attributes: {dir(event)}")
         
-        @client.on("comment")
+        @client.on(CommentEvent)
         async def on_comment(event):
             logger.info(f"Comment received: {event}")
         
-        @client.on("disconnect")
+        @client.on(DisconnectEvent)
         async def on_disconnect(event):
             logger.info(f"Disconnected")
         
