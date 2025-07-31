@@ -252,7 +252,12 @@ function App() {
         method: 'POST',
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        // If TTS is being disabled, clear the queue
+        if (ttsEnabled) {
+          clearTTSQueue();
+        }
+      } else {
         toast.error('Error al cambiar TTS');
       }
     } catch (error) {
