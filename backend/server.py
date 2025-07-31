@@ -136,12 +136,60 @@ class TikTokLiveBot:
         
         @self.client.on(CommentEvent)
         async def on_comment(event):
-            user = getattr(event, 'user', None)
-            user_name = getattr(user, 'nickname', 'Anonymous User') if user else "Anonymous User"
-            message = getattr(event, 'comment', 'No message')
-            
-            logger.info(f"💬 {user_name}: {message}")
-            await self.handle_chat_message(user_name, message)
+            try:
+                # Try to get user info safely with fallback options
+                user_name = "Usuario Anónimo"
+                message = "Mensaje sin contenido"
+                
+                # Multiple fallback methods to get user name
+                try:
+                    if hasattr(event, 'user') and event.user:
+                        user_name = getattr(event.user, 'nickname', 
+                                  getattr(event.user, 'display_name', 
+                                  getattr(event.user, 'unique_id', 'Usuario Anónimo')))
+                except Exception:
+                    try:
+                        # Fallback: try to access user_info directly
+                        if hasattr(event, 'user_info') and event.user_info:
+                            user_info = event.user_info
+                            user_name = getattr(user_info, 'nickName', 
+                                      getattr(user_info, 'displayName',
+                                      getattr(user_info, 'uniqueId', 'Usuario Anónimo')))
+                    except Exception:
+                        try:
+                            # Last fallback: try raw data access
+                            if hasattr(event, 'data') and event.data:
+                                user_data = getattr(event.data, 'user', None)
+                                if user_data:
+                                    user_name = getattr(user_data, 'nickName', 
+                                              getattr(user_data, 'displayName',
+                                              getattr(user_data, 'uniqueId', 'Usuario Anónimo')))
+                        except Exception:
+                            user_name = "Usuario Anónimo"
+                
+                # Get comment text safely
+                try:
+                    if hasattr(event, 'comment'):
+                        message = str(event.comment) if event.comment else "Mensaje vacío"
+                    elif hasattr(event, 'content'):
+                        message = str(event.content) if event.content else "Mensaje vacío"
+                    elif hasattr(event, 'text'):
+                        message = str(event.text) if event.text else "Mensaje vacío"
+                    else:
+                        message = "Mensaje sin contenido"
+                except Exception:
+                    message = "Error al leer mensaje"
+                
+                logger.info(f"💬 Comentario recibido - {user_name}: {message}")
+                await self.handle_chat_message(user_name, message)
+                
+            except Exception as e:
+                logger.error(f"Error processing comment event: {e}")
+                # Try to process with minimal info to avoid complete failure
+                try:
+                    await self.handle_chat_message("Usuario Desconocido", "Mensaje no procesable")
+                except Exception as fallback_error:
+                    logger.error(f"Fallback comment processing also failed: {fallback_error}")
         
         @self.client.on(DisconnectEvent)
         async def on_disconnect(event):
