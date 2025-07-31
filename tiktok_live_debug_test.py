@@ -15,7 +15,7 @@ import sys
 import os
 
 class TikTokLiveDebugTester:
-    def __init__(self, base_url="https://16dc95cf-bf22-40a9-9086-b03a45b6b471.preview.emergentagent.com"):
+    def __init__(self, base_url="https://87a199ed-5261-4b20-b5f9-536c6cc6e387.preview.emergentagent.com"):
         self.base_url = base_url
         self.ws_messages = []
         self.ws_connected = False
