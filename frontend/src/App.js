@@ -203,15 +203,15 @@ function App() {
     }
   };
 
-  // Clear TTS queue when TTS is disabled - Improved version
+  // Clear TTS queue when TTS is disabled - Enhanced version
   const clearTTSQueue = () => {
-    console.log('Clearing TTS queue and stopping all speech...');
+    console.log('🧹 Clearing TTS queue and stopping all speech...');
     
     // Clear the queue
     ttsQueue.current = [];
     setTtsQueueLength(0);
     
-    // Cancel any ongoing speech
+    // Cancel any ongoing speech only when explicitly clearing
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
@@ -220,7 +220,7 @@ function App() {
     isProcessingTTS.current = false;
     setIsProcessingTTSState(false);
     
-    console.log('TTS queue cleared and speech stopped');
+    console.log('✅ TTS queue cleared and speech stopped');
   };
 
   // WebSocket Setup
