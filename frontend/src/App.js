@@ -252,9 +252,32 @@ function App() {
     }
   };
 
+  // Detectar cuando el usuario scrollea manualmente
+  const handleScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.target;
+    const isAtBottom = scrollHeight - scrollTop === clientHeight;
+    
+    // Si el usuario scrollea manualmente lejos del bottom, pausar auto-scroll
+    if (scrollTop < scrollHeight - clientHeight - 50 && shouldAutoScroll.current) {
+      shouldAutoScroll.current = false;
+    }
+    // Si el usuario scrollea de vuelta al bottom, reactivar auto-scroll
+    else if (isAtBottom && !shouldAutoScroll.current) {
+      shouldAutoScroll.current = true;
+    }
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [chatMessages]);
+
+  useEffect(() => {
+    const scrollElement = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (scrollElement) {
+      scrollElement.addEventListener('scroll', handleScroll);
+      return () => scrollElement.removeEventListener('scroll', handleScroll);
+    }
+  }, [chatMessages.length]);
 
   const getConnectionIcon = () => {
     switch (connectionStatus) {
