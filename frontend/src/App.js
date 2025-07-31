@@ -494,13 +494,45 @@ function App() {
     }
   };
 
-  const testTTS = () => {
+  // Enhanced TTS test function with direct TTS testing
+  const testTTS = async () => {
+    if (!ttsEnabled) {
+      toast.error('TTS está desactivado');
+      return;
+    }
+    
+    console.log('🧪 Testing TTS functionality...');
+    
+    // Method 1: Direct TTS test (preferred for real functionality test)
+    try {
+      const testMessage = "¡Hola! Esto es una prueba del sistema TTS mejorado.";
+      const testUser = "Sistema de Prueba";
+      
+      console.log('🎤 Performing direct TTS test...');
+      await speak(testMessage, testUser);
+      console.log('✅ Direct TTS test completed successfully');
+      toast.success('Prueba TTS completada exitosamente');
+      return;
+    } catch (error) {
+      console.error('❌ Direct TTS test failed:', error);
+      toast.error('Error en prueba TTS directa: ' + error.message);
+    }
+    
+    // Method 2: Fallback to WebSocket test message (if direct fails)
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'test_message'
-      }));
+      console.log('🔄 Falling back to WebSocket test message...');
+      try {
+        wsRef.current.send(JSON.stringify({
+          type: 'test_message'
+        }));
+        toast.info('Mensaje de prueba enviado via WebSocket');
+      } catch (wsError) {
+        console.error('❌ WebSocket test also failed:', wsError);
+        toast.error('Error enviando mensaje de prueba');
+      }
     } else {
-      toast.error('WebSocket no conectado');
+      console.warn('⚠️ WebSocket no disponible para prueba de respaldo');
+      toast.error('WebSocket desconectado - no se puede probar TTS');
     }
   };
 
