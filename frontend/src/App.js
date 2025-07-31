@@ -452,6 +452,8 @@ function App() {
 
   const disconnectFromTikTok = async (force = false) => {
     setIsLoading(true);
+    setUserDisconnected(true); // Prevent WebSocket auto-reconnect
+    
     try {
       const endpoint = force ? '/api/force-disconnect' : '/api/disconnect';
       const response = await fetch(`${BACKEND_URL}${endpoint}`, {
@@ -463,12 +465,22 @@ function App() {
         toast.success(data.message);
         setChatMessages([]);
         clearTTSQueue(); // Clear TTS queue on disconnect
+        
+        // Update frontend state immediately
+        setIsConnected(false);
+        setCurrentUsername('');
+        setConnectionStatus('disconnected');
+        
       } else {
         toast.error('Error al desconectar');
+        // Reset flag if disconnection failed
+        setUserDisconnected(false);
       }
     } catch (error) {
       toast.error('Error de conexión al servidor');
       console.error('Disconnect error:', error);
+      // Reset flag if disconnection failed
+      setUserDisconnected(false);
     } finally {
       setIsLoading(false);
     }
