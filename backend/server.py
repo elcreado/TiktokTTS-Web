@@ -208,9 +208,12 @@ class TikTokLiveBot:
         """Start the TikTok Live client"""
         try:
             if self.client:
+                logger.info(f"🚀 Starting TikTok Live client for @{self.username}")
                 await self.client.start()
+                logger.info(f"🎯 TikTok Live client started successfully")
         except Exception as e:
-            logger.error(f"Error starting TikTok client: {e}")
+            logger.error(f"💥 Error starting TikTok client: {e}")
+            logger.error(f"Error type: {type(e)}")
             self.is_connected = False
             
             # Handle specific TikTok errors
