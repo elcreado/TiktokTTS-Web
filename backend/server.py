@@ -97,14 +97,11 @@ class TikTokLiveBot:
             # Initialize TikTok Live client with configuration similar to your working JavaScript code
             self.client = TikTokLiveClient(
                 unique_id=clean_username,
-                process_initial_data=False,
-                fetch_room_info_on_connect=True,
                 enable_extended_gift_info=True,
                 ping_interval_ms=2000,  # Similar to requestPollingIntervalMs: 2000
                 headers={
                     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
                 },
-                websocket_enabled=True,
                 sign_api_key=sing_api_key if sing_api_key else None,
                 lang="en-US"
             )
