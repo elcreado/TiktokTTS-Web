@@ -415,7 +415,7 @@ function App() {
           {/* Chat Display */}
           <div className="lg:col-span-2">
             <Card className="bg-black/40 backdrop-blur-sm border-white/10 h-[600px] flex flex-col">
-              <CardHeader>
+              <CardHeader className="pb-4">
                 <CardTitle className="text-white flex items-center space-x-2">
                   <MessageCircle className="w-5 h-5" />
                   <span>Chat en Vivo</span>
@@ -426,14 +426,14 @@ function App() {
                   )}
                 </CardTitle>
                 <CardDescription className="text-gray-300">
-                  Mensajes en tiempo real de TikTok Live
+                  Mensajes en tiempo real de TikTok Live {chatMessages.length > 0 && `(${chatMessages.length} mensajes)`}
                 </CardDescription>
               </CardHeader>
               
-              <CardContent className="flex-1 flex flex-col">
-                <ScrollArea className="flex-1 pr-4">
+              <CardContent className="flex-1 overflow-hidden p-0">
+                <ScrollArea className="h-full px-6 pb-4">
                   {chatMessages.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-gray-400">
+                    <div className="flex items-center justify-center h-[400px] text-gray-400">
                       <div className="text-center">
                         <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
                         <p>No hay mensajes aún</p>
@@ -441,22 +441,32 @@ function App() {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      {[...chatMessages].reverse().map((msg) => (
+                    <div className="space-y-3 py-2">
+                      {chatMessages.slice().reverse().map((msg, index) => (
                         <div 
                           key={msg.id}
-                          className="bg-white/5 rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-colors"
+                          className="bg-white/5 rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-colors animate-in slide-in-from-bottom-2 duration-300"
+                          style={{ animationDelay: `${index * 50}ms` }}
                         >
-                          <div className="flex items-center space-x-2 mb-1">
-                            <span className="font-semibold text-pink-400">@{msg.user}</span>
-                            <span className="text-xs text-gray-400">
-                              {msg.timestamp?.toLocaleTimeString()}
-                            </span>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-semibold text-pink-400 text-sm">@{msg.user}</span>
+                              <div className="w-1 h-1 bg-gray-500 rounded-full" />
+                              <span className="text-xs text-gray-400">
+                                {msg.timestamp?.toLocaleTimeString('es-ES', { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit',
+                                  second: '2-digit'
+                                })}
+                              </span>
+                            </div>
+                            <Badge variant="outline" className="text-xs px-2 py-0 border-white/20 text-gray-300">
+                              #{chatMessages.length - index}
+                            </Badge>
                           </div>
-                          <p className="text-white text-sm leading-relaxed">{msg.message}</p>
+                          <p className="text-white text-sm leading-relaxed break-words">{msg.message}</p>
                         </div>
                       ))}
-                      <div ref={chatEndRef} />
                     </div>
                   )}
                 </ScrollArea>
