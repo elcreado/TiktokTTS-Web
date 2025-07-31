@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from dotenv import load_dotenv
 import os
 from motor.motor_asyncio import AsyncIOMotorClient
 import asyncio
@@ -10,6 +11,9 @@ from datetime import datetime
 import uvicorn
 from typing import List, Dict, Optional
 import uuid
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
