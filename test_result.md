@@ -177,11 +177,11 @@ frontend:
 
   - task: "Fix TTS queue interruption issue"
     implemented: true
-    working: "NA"
+    working: false
     file: "/app/frontend/src/App.js"
-    stuck_count: 1
+    stuck_count: 2
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "main"
@@ -195,6 +195,9 @@ frontend:
         - working: "NA"
           agent: "main"
           comment: "Investigating message duplication issue. Simplified speak() function to prevent duplicate event handlers, added detailed logging to addToTTSQueue and processTTSQueue to track message flow and identify where duplication occurs. Enhanced logging includes message IDs, queue state tracking, and detailed processing steps to debug the duplication problem."
+        - working: false
+          agent: "testing"
+          comment: "🚨 CRITICAL ISSUE IDENTIFIED: TTS MESSAGE DUPLICATION BUG CONFIRMED! Comprehensive testing with detailed console log analysis reveals the ROOT CAUSE: **Backend WebSocket is sending duplicate messages**, NOT frontend TTS queue issue. Evidence: 1) DUPLICATION PATTERN: Same chat messages received multiple times with different IDs and timestamps (e.g., 'doblesss' by JOANY ALLISON received twice: ID 1753931993578.8862 and ID 1753931993643.1633). 2) FRONTEND TTS QUEUE: Working perfectly - proper FIFO processing, correct queue management, no interruption, sequential processing as designed. 3) ROOT CAUSE: Backend WebSocket broadcasting same chat message multiple times, causing frontend to correctly process each duplicate as separate TTS message. 4) USER EXPERIENCE: Messages 'play twice' because they ARE being sent twice from backend. 5) SOLUTION NEEDED: Fix backend WebSocket message deduplication, not frontend TTS logic. Frontend TTS functionality is working correctly - it's processing duplicate data from backend as expected. All UI components functional: TTS toggle (✅), queue display (✅), WebSocket connection (✅), chat display (✅). The issue requires backend investigation and fix for WebSocket message duplication."
 
 metadata:
   created_by: "main_agent"
