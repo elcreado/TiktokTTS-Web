@@ -740,7 +740,7 @@ function App() {
                   </div>
                 </div>
                 
-                {/* TTS Queue Status */}
+                {/* TTS Queue Status & Diagnostics */}
                 {ttsEnabled && (
                   <div className="mt-4 pt-4 border-t border-white/10">
                     <div className="flex items-center justify-between text-sm">
@@ -752,6 +752,8 @@ function App() {
                         )}
                       </div>
                     </div>
+                    
+                    {/* TTS Queue Progress Bar */}
                     {ttsQueueLength > 0 && (
                       <div className="mt-2">
                         <div className="w-full bg-gray-700 rounded-full h-1.5">
@@ -761,10 +763,36 @@ function App() {
                           ></div>
                         </div>
                         <div className="text-xs text-gray-400 mt-1">
-                          {isProcessingTTSState ? 'Reproduciendo...' : 'En espera'}
+                          {isProcessingTTSState ? 'Reproduciendo mensaje...' : 'Mensaje en espera'}
                         </div>
                       </div>
                     )}
+                    
+                    {/* TTS Diagnostics */}
+                    <div className="mt-3 space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-400">Estado:</span>
+                        <span className={`${isProcessingTTSState ? 'text-green-400' : 'text-gray-400'}`}>
+                          {isProcessingTTSState ? '🔊 Activo' : '⏸️ Inactivo'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-400">API Speech:</span>
+                        <span className={`${window.speechSynthesis ? 'text-green-400' : 'text-red-400'}`}>
+                          {window.speechSynthesis ? '✅ Disponible' : '❌ No disponible'}
+                        </span>
+                      </div>
+                      
+                      {window.speechSynthesis && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-400">Voces ES:</span>
+                          <span className="text-blue-400">
+                            {window.speechSynthesis.getVoices().filter(v => v.lang.includes('es')).length} voces
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </CardContent>
