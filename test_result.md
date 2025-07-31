@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Fix TikTok Live connection error: WebcastPushConnection.__init__() got an unexpected keyword argument 'debug'. The application is a TikTok Live TTS Bot that connects to live streams to read chat messages. User provided working JavaScript configuration that should be adapted to Python implementation."
+user_problem_statement: "Fix TTS queue management: When TTS is reading a message and a new message arrives in chat, TTS should complete the current message before starting the new one. Implement a smart queue system with maximum 2 messages (1 playing + 1 waiting) to prevent delays while maintaining temporal relevance."
 
 backend:
   - task: "Update TikTokLive library to latest version 6.5.2"
