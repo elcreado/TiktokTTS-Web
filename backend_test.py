@@ -520,11 +520,33 @@ def main():
     # Test disconnect
     tester.test_disconnect()
     
+    # Test new enhanced endpoints
+    print("\n🔧 ENHANCED DISCONNECTION SYSTEM TESTS")
+    print("-" * 40)
+    
+    tester.test_force_disconnect()
+    tester.test_connection_details()
+    tester.test_comprehensive_disconnect_system()
+    
+    # Test connection state management
+    print("\n🔄 CONNECTION STATE MANAGEMENT TESTS")
+    print("-" * 40)
+    
+    tester.test_connection_state_management()
+    tester.test_error_handling_and_timeouts()
+    
+    # Test backend stability
+    print("\n⚡ BACKEND STABILITY TESTS")
+    print("-" * 30)
+    
+    tester.test_rapid_connect_disconnect_cycles()
+    
     # Test WebSocket
     print("\n🌐 WEBSOCKET TESTS")
     print("-" * 30)
     
     tester.test_websocket_connection()
+    tester.test_websocket_real_time_communication()
     
     # Print final results
     print("\n" + "=" * 60)
