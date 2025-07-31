@@ -140,7 +140,217 @@ class TikTokTTSBotTester:
         ws.send(test_message)
         print(f"📤 Sent test message: {test_message}")
 
-    def test_websocket_connection(self):
+    def test_comprehensive_disconnect_system(self):
+        """Test the enhanced disconnection system comprehensively"""
+        print(f"\n🔍 Testing Enhanced Disconnection System...")
+        
+        # First, get initial connection details
+        print("   📊 Getting initial connection state...")
+        initial_success, initial_data = self.run_test("Initial Connection Details", "GET", "api/connection-details", 200)
+        
+        if initial_success:
+            print(f"   Initial state: connected={initial_data.get('is_connected', False)}")
+        
+        # Test regular disconnect
+        print("   🔌 Testing regular disconnect...")
+        disconnect_success, disconnect_data = self.run_test("Regular Disconnect", "POST", "api/disconnect", 200)
+        
+        # Wait a moment for cleanup
+        time.sleep(2)
+        
+        # Check connection details after disconnect
+        print("   📊 Checking state after regular disconnect...")
+        after_disconnect_success, after_disconnect_data = self.run_test("Connection Details After Disconnect", "GET", "api/connection-details", 200)
+        
+        if after_disconnect_success:
+            print(f"   State after disconnect: connected={after_disconnect_data.get('is_connected', False)}")
+        
+        # Test force disconnect
+        print("   💪 Testing force disconnect...")
+        force_disconnect_success, force_disconnect_data = self.run_test("Force Disconnect", "POST", "api/force-disconnect", 200)
+        
+        # Wait a moment for cleanup
+        time.sleep(2)
+        
+        # Check final connection details
+        print("   📊 Checking final state after force disconnect...")
+        final_success, final_data = self.run_test("Final Connection Details", "GET", "api/connection-details", 200)
+        
+        if final_success:
+            print(f"   Final state: connected={final_data.get('is_connected', False)}")
+        
+        # Evaluate overall success
+        overall_success = all([
+            initial_success,
+            disconnect_success,
+            after_disconnect_success,
+            force_disconnect_success,
+            final_success
+        ])
+        
+        if overall_success:
+            print("✅ Enhanced Disconnection System test passed")
+        else:
+            print("❌ Enhanced Disconnection System test failed")
+        
+        return overall_success
+
+    def test_connection_state_management(self):
+        """Test connection and disconnection sequences multiple times"""
+        print(f"\n🔍 Testing Connection State Management...")
+        
+        test_username = "charlidamelio"  # Popular TikTok user
+        success_count = 0
+        total_cycles = 3
+        
+        for cycle in range(total_cycles):
+            print(f"   🔄 Cycle {cycle + 1}/{total_cycles}")
+            
+            # Get initial state
+            initial_success, initial_data = self.run_test(f"Cycle {cycle+1} - Initial State", "GET", "api/connection-details", 200)
+            if initial_success:
+                success_count += 1
+            
+            # Attempt connection
+            connect_success, connect_data = self.run_test(
+                f"Cycle {cycle+1} - Connect",
+                "POST",
+                "api/connect",
+                200,
+                data={"username": test_username}
+            )
+            if connect_success:
+                success_count += 1
+            
+            # Wait for connection attempt
+            time.sleep(3)
+            
+            # Check state after connection attempt
+            after_connect_success, after_connect_data = self.run_test(f"Cycle {cycle+1} - State After Connect", "GET", "api/connection-details", 200)
+            if after_connect_success:
+                success_count += 1
+            
+            # Disconnect
+            disconnect_success, disconnect_data = self.run_test(f"Cycle {cycle+1} - Disconnect", "POST", "api/disconnect", 200)
+            if disconnect_success:
+                success_count += 1
+            
+            # Wait for disconnect
+            time.sleep(2)
+            
+            # Check final state
+            final_success, final_data = self.run_test(f"Cycle {cycle+1} - Final State", "GET", "api/connection-details", 200)
+            if final_success:
+                success_count += 1
+                if final_data.get('is_connected', True) == False:
+                    print(f"   ✅ Cycle {cycle+1}: Connection properly reset")
+                else:
+                    print(f"   ⚠️ Cycle {cycle+1}: Connection may not be properly reset")
+        
+        expected_tests = total_cycles * 5  # 5 tests per cycle
+        success_rate = (success_count / expected_tests) * 100
+        
+        print(f"   📊 Connection State Management: {success_count}/{expected_tests} tests passed ({success_rate:.1f}%)")
+        
+        return success_count == expected_tests
+
+    def test_error_handling_and_timeouts(self):
+        """Test connection to invalid/offline users and verify proper error handling"""
+        print(f"\n🔍 Testing Error Handling and Timeouts...")
+        
+        # Test with completely invalid username
+        invalid_usernames = ["", "nonexistentuser12345", "@invaliduser", "user with spaces"]
+        success_count = 0
+        
+        for username in invalid_usernames:
+            print(f"   🚫 Testing invalid username: '{username}'")
+            
+            if username == "":
+                # Empty username should return 400
+                success, data = self.run_test(
+                    f"Invalid Username: '{username}'",
+                    "POST",
+                    "api/connect",
+                    400,
+                    data={"username": username}
+                )
+            else:
+                # Other invalid usernames should return 200 but fail to connect
+                success, data = self.run_test(
+                    f"Invalid Username: '{username}'",
+                    "POST",
+                    "api/connect",
+                    200,
+                    data={"username": username}
+                )
+            
+            if success:
+                success_count += 1
+            
+            # Wait and then disconnect to clean up
+            time.sleep(2)
+            self.run_test("Cleanup Disconnect", "POST", "api/disconnect", 200)
+            time.sleep(1)
+        
+        print(f"   📊 Error Handling: {success_count}/{len(invalid_usernames)} tests passed")
+        
+        return success_count == len(invalid_usernames)
+
+    def test_rapid_connect_disconnect_cycles(self):
+        """Test multiple rapid connect/disconnect cycles for backend stability"""
+        print(f"\n🔍 Testing Rapid Connect/Disconnect Cycles...")
+        
+        test_username = "charlidamelio"
+        rapid_cycles = 5
+        success_count = 0
+        
+        for cycle in range(rapid_cycles):
+            print(f"   ⚡ Rapid cycle {cycle + 1}/{rapid_cycles}")
+            
+            # Quick connect
+            connect_success, _ = self.run_test(
+                f"Rapid Connect {cycle+1}",
+                "POST",
+                "api/connect",
+                200,
+                data={"username": test_username},
+                timeout=5
+            )
+            
+            # Minimal wait
+            time.sleep(0.5)
+            
+            # Quick disconnect
+            disconnect_success, _ = self.run_test(
+                f"Rapid Disconnect {cycle+1}",
+                "POST",
+                "api/disconnect",
+                200,
+                timeout=5
+            )
+            
+            # Minimal wait
+            time.sleep(0.5)
+            
+            if connect_success and disconnect_success:
+                success_count += 1
+        
+        # Final cleanup with force disconnect
+        print("   🧹 Final cleanup with force disconnect...")
+        self.run_test("Final Force Disconnect", "POST", "api/force-disconnect", 200)
+        time.sleep(1)
+        
+        # Check final state
+        final_success, final_data = self.run_test("Final State Check", "GET", "api/connection-details", 200)
+        
+        print(f"   📊 Rapid Cycles: {success_count}/{rapid_cycles} cycles completed successfully")
+        
+        if final_success and final_data.get('is_connected', True) == False:
+            print("   ✅ Backend stability maintained - no stuck connections")
+            return success_count >= (rapid_cycles * 0.8)  # Allow 20% failure rate for rapid cycles
+        else:
+            print("   ⚠️ Potential backend stability issue detected")
+            return False
         """Test WebSocket connection"""
         print(f"\n🔍 Testing WebSocket Connection...")
         
