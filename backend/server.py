@@ -1,75 +1,257 @@
-from fastapi import FastAPI, APIRouter
-from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import os
+from motor.motor_asyncio import AsyncIOMotorClient
+import asyncio
+import json
 import logging
-from pathlib import Path
-from pydantic import BaseModel, Field
-from typing import List
-import uuid
 from datetime import datetime
+import uvicorn
+from typing import List, Dict, Optional
+import uuid
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+app = FastAPI(title="TikTok Live TTS Bot", version="1.0.0")
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
-
-# Create the main app without a prefix
-app = FastAPI()
-
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
-
-
-# Define Models
-class StatusCheck(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-class StatusCheckCreate(BaseModel):
-    client_name: str
-
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
-async def root():
-    return {"message": "Hello World"}
-
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
-
-# Include the router in the main app
-app.include_router(api_router)
-
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Database setup
+MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+client = AsyncIOMotorClient(MONGO_URL)
+db = client.tiktok_tts_bot
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
+# Global variables for connection management
+tiktok_connections: Dict[str, object] = {}
+websocket_connections: List[WebSocket] = []
+tts_enabled = True
+current_username = ""
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        try:
+            await websocket.send_text(message)
+        except Exception as e:
+            logger.error(f"Error sending message: {e}")
+            self.disconnect(websocket)
+
+    async def broadcast(self, message: str):
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except Exception as e:
+                logger.error(f"Error in broadcast: {e}")
+                disconnected.append(connection)
+        
+        for conn in disconnected:
+            self.disconnect(conn)
+
+manager = ConnectionManager()
+
+# TikTok Live Integration
+class TikTokLiveBot:
+    def __init__(self):
+        self.client = None
+        self.is_connected = False
+        self.username = ""
+        
+    async def connect_to_stream(self, username: str):
+        try:
+            # This is a placeholder for TikTokLive integration
+            # We'll install the actual library next
+            self.username = username
+            self.is_connected = True
+            
+            # Simulate connection success
+            await manager.broadcast(json.dumps({
+                "type": "connection_status",
+                "connected": True,
+                "username": username,
+                "timestamp": datetime.now().isoformat()
+            }))
+            
+            logger.info(f"Connected to @{username}'s live stream")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to connect to TikTok live: {e}")
+            await manager.broadcast(json.dumps({
+                "type": "connection_status",
+                "connected": False,
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }))
+            return False
+    
+    async def disconnect_from_stream(self):
+        try:
+            self.is_connected = False
+            self.username = ""
+            
+            await manager.broadcast(json.dumps({
+                "type": "connection_status",
+                "connected": False,
+                "username": "",
+                "timestamp": datetime.now().isoformat()
+            }))
+            
+            logger.info("Disconnected from TikTok live stream")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to disconnect: {e}")
+            return False
+    
+    async def handle_chat_message(self, user: str, message: str):
+        """Handle incoming chat messages from TikTok Live"""
+        global tts_enabled
+        
+        chat_data = {
+            "type": "chat_message",
+            "user": user,
+            "message": message,
+            "timestamp": datetime.now().isoformat(),
+            "tts_enabled": tts_enabled
+        }
+        
+        # Broadcast to all connected clients
+        await manager.broadcast(json.dumps(chat_data))
+        
+        # Store in database
+        await db.chat_messages.insert_one({
+            "id": str(uuid.uuid4()),
+            "user": user,
+            "message": message,
+            "timestamp": datetime.now(),
+            "username_stream": self.username
+        })
+        
+        logger.info(f"Chat message from {user}: {message}")
+
+# Initialize TikTok bot
+tiktok_bot = TikTokLiveBot()
+
+# API Routes
+@app.get("/")
+async def root():
+    return {"message": "TikTok Live TTS Bot API", "status": "running"}
+
+@app.get("/api/status")
+async def get_status():
+    return {
+        "connected": tiktok_bot.is_connected,
+        "username": tiktok_bot.username,
+        "tts_enabled": tts_enabled,
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.post("/api/connect")
+async def connect_tiktok(data: dict):
+    username = data.get("username", "").replace("@", "")
+    if not username:
+        raise HTTPException(status_code=400, detail="Username is required")
+    
+    global current_username
+    current_username = username
+    
+    success = await tiktok_bot.connect_to_stream(username)
+    
+    if success:
+        return {"success": True, "message": f"Connected to @{username}"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to connect to TikTok live")
+
+@app.post("/api/disconnect")
+async def disconnect_tiktok():
+    global current_username
+    current_username = ""
+    
+    success = await tiktok_bot.disconnect_from_stream()
+    
+    if success:
+        return {"success": True, "message": "Disconnected from TikTok live"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to disconnect")
+
+@app.post("/api/toggle-tts")
+async def toggle_tts():
+    global tts_enabled
+    tts_enabled = not tts_enabled
+    
+    await manager.broadcast(json.dumps({
+        "type": "tts_status",
+        "enabled": tts_enabled,
+        "timestamp": datetime.now().isoformat()
+    }))
+    
+    return {"tts_enabled": tts_enabled}
+
+@app.get("/api/chat-history")
+async def get_chat_history(limit: int = 50):
+    messages = await db.chat_messages.find().sort("timestamp", -1).limit(limit).to_list(length=limit)
+    
+    # Convert ObjectId to string and format for frontend
+    formatted_messages = []
+    for msg in messages:
+        formatted_messages.append({
+            "id": msg.get("id", str(msg["_id"])),
+            "user": msg["user"],
+            "message": msg["message"],
+            "timestamp": msg["timestamp"].isoformat() if hasattr(msg["timestamp"], 'isoformat') else str(msg["timestamp"])
+        })
+    
+    return {"messages": formatted_messages}
+
+# WebSocket endpoint
+@app.websocket("/api/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            message_data = json.loads(data)
+            
+            # Handle different message types
+            if message_data.get("type") == "test_message":
+                # Simulate a chat message for testing
+                await tiktok_bot.handle_chat_message("TestUser", "¡Hola! Este es un mensaje de prueba")
+            
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        manager.disconnect(websocket)
+
+# Health check endpoint
+@app.get("/api/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "database": "connected" if client else "disconnected",
+        "timestamp": datetime.now().isoformat()
+    }
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8001)
