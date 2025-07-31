@@ -45,69 +45,149 @@ function App() {
   const ttsQueue = useRef([]);
   const isProcessingTTS = useRef(false);
 
-  // TTS Setup with Queue System
+  // TTS Setup with Improved Queue System
   const speak = (text, user) => {
-    if (!ttsEnabled || !window.speechSynthesis) return;
-    
-    const utterance = new SpeechSynthesisUtterance(`${user} dice: ${text}`);
-    utterance.lang = 'es-ES'; // Spanish language
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
-    utterance.volume = 0.8;
-    
-    // Get available voices and prefer Spanish ones
-    const voices = window.speechSynthesis.getVoices();
-    const spanishVoice = voices.find(voice => 
-      voice.lang.includes('es') || voice.name.includes('Spanish')
-    );
-    
-    if (spanishVoice) {
-      utterance.voice = spanishVoice;
-    }
+    if (!ttsEnabled || !window.speechSynthesis) return Promise.resolve();
     
     return new Promise((resolve) => {
-      utterance.onend = () => {
-        resolve();
-      };
-      utterance.onerror = () => {
-        resolve(); // Resolve even on error to continue processing queue
+      // Cancel any ongoing speech to prevent overlap
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(`${user} dice: ${text}`);
+      utterance.lang = 'es-ES'; // Spanish language
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.volume = 0.8;
+      
+      // Get available voices and prefer Spanish ones
+      const voices = window.speechSynthesis.getVoices();
+      const spanishVoice = voices.find(voice => 
+        voice.lang.includes('es') || voice.name.includes('Spanish')
+      );
+      
+      if (spanishVoice) {
+        utterance.voice = spanishVoice;
+      }
+      
+      // Set up event handlers for more reliable completion detection
+      let resolved = false;
+      
+      const resolveOnce = () => {
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
       };
       
-      window.speechSynthesis.speak(utterance);
+      utterance.onend = resolveOnce;
+      utterance.onerror = (error) => {
+        console.warn('TTS error:', error);
+        resolveOnce();
+      };
+      
+      // Fallback timeout to prevent hanging
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          console.warn('TTS timeout, forcing completion');
+          window.speechSynthesis.cancel();
+          resolveOnce();
+        }
+      }, Math.max(text.length * 100, 3000)); // Dynamic timeout based on text length
+      
+      utterance.onend = () => {
+        clearTimeout(timeout);
+        resolveOnce();
+      };
+      
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch (error) {
+        console.error('Error speaking utterance:', error);
+        clearTimeout(timeout);
+        resolveOnce();
+      }
     });
   };
 
-  // TTS Queue Management
+  // Improved TTS Queue Management
   const addToTTSQueue = (text, user) => {
     if (!ttsEnabled) return;
     
+    const messageData = { 
+      text, 
+      user, 
+      timestamp: Date.now(),
+      id: Date.now() + Math.random() // Unique ID for tracking
+    };
+    
     // Add to queue but limit size to prevent excessive accumulation
     if (ttsQueue.current.length < MAX_TTS_QUEUE) {
-      ttsQueue.current.push({ text, user, timestamp: Date.now() });
-      processTTSQueue();
+      ttsQueue.current.push(messageData);
+      console.log(`Added to TTS queue: "${text}" by ${user} (Queue length: ${ttsQueue.current.length})`);
+      
+      // Start processing if not already running
+      if (!isProcessingTTS.current) {
+        processTTSQueue();
+      }
     } else {
-      console.log('TTS queue full, skipping message:', { text, user });
+      console.warn('TTS queue full, discarding oldest message');
+      // Remove oldest message and add new one
+      ttsQueue.current.shift();
+      ttsQueue.current.push(messageData);
     }
   };
 
   const processTTSQueue = async () => {
-    if (isProcessingTTS.current || ttsQueue.current.length === 0) return;
-    
-    isProcessingTTS.current = true;
-    
-    while (ttsQueue.current.length > 0 && ttsEnabled) {
-      const message = ttsQueue.current.shift();
-      
-      try {
-        await speak(message.text, message.user);
-        // Small delay between messages for better listening experience
-        await new Promise(resolve => setTimeout(resolve, 500));
-      } catch (error) {
-        console.error('Error in TTS:', error);
-      }
+    if (isProcessingTTS.current) {
+      console.log('TTS queue already processing, skipping...');
+      return;
     }
     
-    isProcessingTTS.current = false;
+    if (ttsQueue.current.length === 0) {
+      console.log('TTS queue is empty');
+      return;
+    }
+    
+    console.log(`Starting TTS queue processing with ${ttsQueue.current.length} messages`);
+    isProcessingTTS.current = true;
+    
+    try {
+      while (ttsQueue.current.length > 0 && ttsEnabled) {
+        const message = ttsQueue.current.shift();
+        
+        console.log(`Processing TTS message ${message.id}: "${message.text}" by ${message.user}`);
+        
+        try {
+          // Wait for the current message to complete before proceeding
+          await speak(message.text, message.user);
+          console.log(`Completed TTS message ${message.id}`);
+          
+          // Add a pause between messages for better listening experience
+          await new Promise(resolve => setTimeout(resolve, 800));
+          
+        } catch (error) {
+          console.error(`Error processing TTS message ${message.id}:`, error);
+          // Continue with next message even if current one fails
+        }
+        
+        // Check if TTS was disabled during processing
+        if (!ttsEnabled) {
+          console.log('TTS disabled during processing, stopping queue');
+          break;
+        }
+      }
+    } catch (error) {
+      console.error('Error in TTS queue processing:', error);
+    } finally {
+      isProcessingTTS.current = false;
+      console.log(`TTS queue processing finished. Remaining messages: ${ttsQueue.current.length}`);
+      
+      // If there are still messages and TTS is enabled, continue processing
+      if (ttsQueue.current.length > 0 && ttsEnabled) {
+        console.log('More messages in queue, continuing processing...');
+        setTimeout(() => processTTSQueue(), 100);
+      }
+    }
   };
 
   // Clear TTS queue when TTS is disabled
