@@ -93,7 +93,11 @@ function App() {
             timestamp: new Date(data.timestamp)
           };
           
-          setChatMessages(prev => [newMessage, ...prev]);
+          setChatMessages(prev => {
+            const updated = [newMessage, ...prev];
+            // Mantener solo los últimos MAX_MESSAGES mensajes
+            return updated.slice(0, MAX_MESSAGES);
+          });
           
           // TTS for new messages
           if (data.tts_enabled && ttsEnabled) {
