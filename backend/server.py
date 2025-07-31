@@ -86,30 +86,36 @@ class TikTokLiveBot:
             # Clean username (remove @ if present)
             clean_username = username.replace("@", "").strip()
             
-            # Add SING_API_KEY to environment if provided
-            sing_api_key = "YzhhZDg5ZWEyMTE2ZDJjNGIyYmRhNjcwNGFkNWZlNmY3NjkxYmNmYTQzYzFmYzk5ZTNkYzI2"
+            # Get SING_API_KEY from environment
+            sing_api_key = os.environ.get('SING_API_KEY', '')
             
             # Initialize TikTok Live client with enhanced configuration
-            self.client = TikTokLiveClient(
-                unique_id=clean_username,
-                web_client_options={
-                    'signApiKey': sing_api_key,
-                    'fetchRoomInfoOnConnect': True,
-                    'enableExtendedGiftInfo': True,
-                    'requestPollingIntervalMs': 2000,
-                    'headers': {
-                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
-                    }
-                },
-                ws_options={
-                    'headers': {
-                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
-                    }
-                },
-                process_initial_data=False,
-                enable_extended_gift_info=True,
-                polling_interval_ms=2000
-            )
+            try:
+                # Try with advanced configuration first
+                self.client = TikTokLiveClient(
+                    unique_id=clean_username,
+                    web_client_options={
+                        'signApiKey': sing_api_key,
+                        'fetchRoomInfoOnConnect': True,
+                        'enableExtendedGiftInfo': True,
+                        'requestPollingIntervalMs': 2000,
+                        'headers': {
+                            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
+                        }
+                    },
+                    process_initial_data=False,
+                    enable_extended_gift_info=True,
+                    polling_interval_ms=2000
+                )
+            except Exception as config_error:
+                logger.warning(f"Advanced config failed, trying basic config: {config_error}")
+                # Fallback to basic configuration
+                self.client = TikTokLiveClient(
+                    unique_id=clean_username,
+                    process_initial_data=False,
+                    enable_extended_gift_info=True,
+                    polling_interval_ms=2000
+                )
             
             # Set up event handlers
             self.setup_event_handlers()
