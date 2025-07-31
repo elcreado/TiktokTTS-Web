@@ -167,6 +167,8 @@ function App() {
     }
     
     console.log(`🎤 Starting TTS processing with ${ttsQueue.current.length} message(s)`);
+    console.log(`📋 Queue contents:`, ttsQueue.current.map(m => `"${m.text}" by ${m.user} (ID: ${m.id})`));
+    
     isProcessingTTS.current = true;
     setIsProcessingTTSState(true);
     
@@ -177,11 +179,12 @@ function App() {
         setTtsQueueLength(ttsQueue.current.length);
         
         console.log(`🎤 Processing TTS message ${message.id}: "${message.text}" by ${message.user}`);
+        console.log(`📊 Queue after shift - remaining messages: ${ttsQueue.current.length}`);
         
         try {
           // Wait for the current message to complete FULLY before proceeding
           await speak(message.text, message.user);
-          console.log(`✅ Completed TTS message ${message.id}`);
+          console.log(`✅ Completed TTS message ${message.id}: "${message.text}" by ${message.user}`);
           
           // Small pause after completion
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -199,6 +202,7 @@ function App() {
         // Continue with next message in queue if available
         if (ttsQueue.current.length > 0) {
           console.log(`📬 ${ttsQueue.current.length} message(s) remaining in queue`);
+          console.log(`📋 Remaining queue:`, ttsQueue.current.map(m => `"${m.text}" by ${m.user} (ID: ${m.id})`));
         }
       }
     } catch (error) {
