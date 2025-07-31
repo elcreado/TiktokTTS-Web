@@ -426,6 +426,8 @@ function App() {
     }
 
     setIsLoading(true);
+    setUserDisconnected(false); // Reset flag when connecting
+    
     try {
       const response = await fetch(`${BACKEND_URL}/api/connect`, {
         method: 'POST',
