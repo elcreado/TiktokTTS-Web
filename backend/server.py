@@ -64,6 +64,12 @@ async def startup_event():
         logger.error(f"❌ Database connection failed: {e}")
         raise
     
+    # Initialize TikTok service dependencies
+    from services.tiktok_service import tiktok_service
+    from services.websocket_manager import websocket_manager
+    tiktok_service.set_dependencies(websocket_manager, db_service)
+    logger.info("✅ TikTok service dependencies initialized")
+    
     logger.info("🎯 TikTok Live TTS Bot started successfully!")
 
 @app.on_event("shutdown")
