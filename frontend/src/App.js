@@ -402,8 +402,14 @@ function App() {
     wsRef.current.onclose = () => {
       console.log('WebSocket desconectado');
       setConnectionStatus('disconnected');
-      // Reconnect after 3 seconds
-      setTimeout(connectWebSocket, 3000);
+      
+      // Only reconnect if user hasn't explicitly disconnected
+      if (!userDisconnected) {
+        console.log('WebSocket desconectado - reconectando en 3 segundos...');
+        setTimeout(connectWebSocket, 3000);
+      } else {
+        console.log('Usuario desconectó manualmente - no reconectando automáticamente');
+      }
     };
 
     wsRef.current.onerror = (error) => {
