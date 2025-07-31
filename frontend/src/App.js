@@ -111,7 +111,7 @@ function App() {
     });
   };
 
-  // Modified TTS Queue Management - Latest Message Priority
+  // Smart TTS Queue Management - Maximum 2 messages (1 playing + 1 waiting)
   const addToTTSQueue = (text, user) => {
     if (!ttsEnabled) return;
     
@@ -122,15 +122,22 @@ function App() {
       id: Date.now() + Math.random()
     };
     
-    // If currently processing, just replace the queue with the latest message
-    // This ensures we always play the most recent message after current one finishes
     if (isProcessingTTS.current) {
-      console.log(`🎤 TTS is playing, replacing queue with latest message: "${text}" by ${user}`);
-      ttsQueue.current = [messageData]; // Replace entire queue with just the latest message
-      setTtsQueueLength(1);
+      // TTS is currently playing a message
+      if (ttsQueue.current.length === 0) {
+        // No message waiting, add this one to queue
+        console.log(`🎤 TTS is playing, adding message to queue: "${text}" by ${user}`);
+        ttsQueue.current = [messageData];
+        setTtsQueueLength(1);
+      } else {
+        // There's already a message waiting, replace it with the latest one
+        console.log(`🎤 TTS is playing and queue is full, replacing waiting message with latest: "${text}" by ${user}`);
+        ttsQueue.current = [messageData]; // Replace the waiting message
+        setTtsQueueLength(1);
+      }
     } else {
-      // If not processing, clear queue and add this message, then start processing
-      console.log(`🎤 Adding message to empty TTS queue: "${text}" by ${user}`);
+      // TTS is not processing, start immediately
+      console.log(`🎤 Adding message to empty TTS queue and starting: "${text}" by ${user}`);
       ttsQueue.current = [messageData];
       setTtsQueueLength(1);
       processTTSQueue();
