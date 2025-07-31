@@ -326,10 +326,11 @@ function App() {
     }
   };
 
-  const disconnectFromTikTok = async () => {
+  const disconnectFromTikTok = async (force = false) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/disconnect`, {
+      const endpoint = force ? '/api/force-disconnect' : '/api/disconnect';
+      const response = await fetch(`${BACKEND_URL}${endpoint}`, {
         method: 'POST',
       });
 
@@ -337,6 +338,7 @@ function App() {
         const data = await response.json();
         toast.success(data.message);
         setChatMessages([]);
+        clearTTSQueue(); // Clear TTS queue on disconnect
       } else {
         toast.error('Error al desconectar');
       }
