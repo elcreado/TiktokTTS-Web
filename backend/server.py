@@ -562,8 +562,10 @@ async def websocket_endpoint(websocket: WebSocket):
             
             # Handle different message types
             if message_data.get("type") == "test_message":
-                # Simulate a chat message for testing
-                await tiktok_bot.handle_chat_message("TestUser", "¡Hola! Este es un mensaje de prueba")
+                # Simulate a chat message for testing using the actual message content
+                user = message_data.get("user", "TestUser")
+                message = message_data.get("message", "Test message")
+                await tiktok_bot.handle_chat_message(user, message)
             
     except WebSocketDisconnect:
         manager.disconnect(websocket)
