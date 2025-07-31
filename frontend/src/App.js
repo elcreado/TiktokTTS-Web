@@ -365,7 +365,7 @@ function App() {
         const data = await response.json();
         const newTTSState = data.tts_enabled;
         
-        // If TTS is being disabled, clear the queue immediately
+        // If TTS is being disabled, clear the queue and stop current speech
         if (!newTTSState) {
           clearTTSQueue();
           toast.info('TTS desactivado - Cola de mensajes limpiada');
