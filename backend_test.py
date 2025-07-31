@@ -806,6 +806,14 @@ def main():
     tester.test_websocket_connection()
     tester.test_websocket_real_time_communication()
     
+    # CRITICAL TEST: Test Aggressive Disconnect Implementation
+    print("\n🔫 AGGRESSIVE DISCONNECT IMPLEMENTATION TEST")
+    print("-" * 50)
+    print("🎯 CRITICAL: Testing complete TikTok connection termination")
+    print("⚠️  This addresses user-reported issue: messages continue after disconnect")
+    
+    tester.test_aggressive_disconnect_implementation()
+    
     # Print final results
     print("\n" + "=" * 60)
     print("📊 TEST RESULTS SUMMARY")
