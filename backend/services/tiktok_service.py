@@ -9,112 +9,171 @@ from TikTokLive.events import ConnectEvent, CommentEvent, DisconnectEvent, UserS
 
 from config.settings import settings
 from models.chat_message import ChatMessage
-from services.database import db_service
-from services.websocket_manager import websocket_manager
 
 logger = logging.getLogger(__name__)
 
 class TikTokService:
-    def __init__(self):
-        self.client: Optional[TikTokLiveClient] = None
-        self.is_connected = False
-        self.username = ""
-        self.connection_task: Optional[asyncio.Task] = None
+    _instance = None
+    _lock = asyncio.Lock()
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(TikTokService, cls).__new__(cls)
+            cls._instance.client: Optional[TikTokLiveClient] = None
+            cls._instance.is_connected = False
+            cls._instance.username = ""
+            cls._instance.connection_task: Optional[asyncio.Task] = None
+            cls._instance._websocket_manager = None
+            cls._instance._db_service = None
+        return cls._instance
+    
+    def set_dependencies(self, websocket_manager, db_service):
+        """Set dependencies to avoid circular imports"""
+        self._websocket_manager = websocket_manager
+        self._db_service = db_service
         
     async def connect_to_stream(self, username: str) -> bool:
-        """Connect to TikTok Live stream"""
+        """Connect to TikTok Live stream with proper cleanup"""
+        async with self._lock:
+            try:
+                # Clean username (remove @ if present)
+                clean_username = username.replace("@", "").strip()
+                
+                logger.info(f"Using SING_API_KEY: {settings.SING_API_KEY[:20]}..." if settings.SING_API_KEY else "No SING_API_KEY found")
+                
+                # CRITICAL: Always force disconnect and cleanup first
+                if self.client or self.is_connected:
+                    logger.info("🧹 FORCE CLEANING: Clearing existing client and event handlers to prevent duplicates")
+                    await self._force_cleanup()
+                
+                # Initialize TikTok Live client with basic configuration for 6.5.2
+                logger.info(f"🔧 Creating NEW TikTok client for @{clean_username}")
+                self.client = TikTokLiveClient(unique_id=clean_username)
+                
+                # Set up event handlers (now on clean client)
+                self._setup_event_handlers()
+                
+                # Start connection in background
+                self.username = clean_username
+                self.connection_task = asyncio.create_task(self._start_client())
+                
+                logger.info(f"Attempting to connect to @{clean_username}'s live stream")
+                return True
+                
+            except Exception as e:
+                logger.error(f"Failed to connect to TikTok live: {e}")
+                import traceback
+                logger.error(f"Full traceback: {traceback.format_exc()}")
+                
+                if self._websocket_manager:
+                    await self._websocket_manager.broadcast_json({
+                        "type": "connection_status",
+                        "connected": False,
+                        "error": str(e),
+                        "timestamp": datetime.now().isoformat()
+                    })
+                return False
+    
+    async def _force_cleanup(self):
+        """Force cleanup of all existing connections and handlers"""
         try:
-            # Clean username (remove @ if present)
-            clean_username = username.replace("@", "").strip()
+            # Set disconnected state immediately
+            self.is_connected = False
             
-            logger.info(f"Using SING_API_KEY: {settings.SING_API_KEY[:20]}..." if settings.SING_API_KEY else "No SING_API_KEY found")
-            
-            # Clear any existing client and handlers to prevent duplicates
-            if self.client:
-                logger.info("🧹 Clearing existing client and event handlers to prevent duplicates")
+            # Cancel existing connection task if running
+            if self.connection_task and not self.connection_task.done():
+                logger.info("Cancelling existing connection task...")
+                self.connection_task.cancel()
                 try:
-                    # Clear event handlers if they exist
+                    await asyncio.wait_for(self.connection_task, timeout=2.0)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    logger.info("Connection task cancelled successfully")
+                except Exception as e:
+                    logger.warning(f"Error cancelling connection task: {e}")
+            
+            # Force stop the client
+            if self.client:
+                logger.info("Force stopping existing TikTok client...")
+                try:
+                    # Clear event handlers immediately
                     if hasattr(self.client, '_event_handlers'):
+                        handler_count = len(self.client._event_handlers) if self.client._event_handlers else 0
+                        logger.info(f"Clearing {handler_count} existing event handlers")
                         self.client._event_handlers.clear()
-                    # Cancel existing connection task if running
-                    if self.connection_task and not self.connection_task.done():
-                        self.connection_task.cancel()
-                except Exception as cleanup_error:
-                    logger.warning(f"⚠️ Error during client cleanup: {cleanup_error}")
+                    
+                    # Try to stop the client
+                    if hasattr(self.client, 'stop'):
+                        await asyncio.wait_for(self.client.stop(), timeout=3.0)
+                    
+                    # Clean up websocket connections
+                    if hasattr(self.client, '_websocket') and self.client._websocket:
+                        await self.client._websocket.close()
+                    
+                except Exception as e:
+                    logger.warning(f"Error during client cleanup: {e}")
             
-            # Initialize TikTok Live client with basic configuration for 6.5.2
-            self.client = TikTokLiveClient(unique_id=clean_username)
+            # Reset all state
+            self.client = None
+            self.connection_task = None
+            self.username = ""
             
-            # Set up event handlers (now on clean client)
-            self._setup_event_handlers()
+            # Force garbage collection
+            import gc
+            gc.collect()
             
-            # Start connection in background
-            self.username = clean_username
-            self.connection_task = asyncio.create_task(self._start_client())
-            
-            logger.info(f"Attempting to connect to @{clean_username}'s live stream")
-            return True
+            logger.info("✅ Force cleanup completed")
             
         except Exception as e:
-            logger.error(f"Failed to connect to TikTok live: {e}")
-            import traceback
-            logger.error(f"Full traceback: {traceback.format_exc()}")
-            
-            await websocket_manager.broadcast_json({
-                "type": "connection_status",
-                "connected": False,
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            })
-            return False
+            logger.error(f"Error in force cleanup: {e}")
     
     def _setup_event_handlers(self):
-        """Set up all TikTok Live event handlers"""
+        """Set up all TikTok Live event handlers with unique identifier"""
         # Generate unique handler ID for debugging
         handler_id = datetime.now().strftime("%H:%M:%S.%f")
-        logger.info(f"🔧 Setting up event handlers with ID: {handler_id}")
+        logger.info(f"🔧 Setting up SINGLE event handler set with ID: {handler_id}")
         
         @self.client.on(ConnectEvent)
         async def on_connect(event):
             self.is_connected = True
-            logger.info(f"✅ [Handler {handler_id}] Successfully connected to live stream!")
+            logger.info(f"✅ [SINGLE Handler {handler_id}] Successfully connected to live stream!")
             
-            await websocket_manager.broadcast_json({
-                "type": "connection_status",
-                "connected": True,
-                "username": getattr(event, 'unique_id', self.username),
-                "timestamp": datetime.now().isoformat()
-            })
+            if self._websocket_manager:
+                await self._websocket_manager.broadcast_json({
+                    "type": "connection_status",
+                    "connected": True,
+                    "username": getattr(event, 'unique_id', self.username),
+                    "timestamp": datetime.now().isoformat()
+                })
         
         @self.client.on(CommentEvent)
         async def on_comment(event):
             try:
-                logger.info(f"🔍 [Handler {handler_id}] Raw comment event received: {type(event)}")
+                logger.info(f"🔍 [SINGLE Handler {handler_id}] Raw comment event received: {type(event)}")
                 
                 # Extract user info safely
                 user_name = self._extract_user_name(event)
                 message = self._extract_message_content(event)
                 
-                logger.info(f"💬 [Handler {handler_id}] Comentario procesado - {user_name}: {message}")
+                logger.info(f"💬 [SINGLE Handler {handler_id}] Comentario procesado - {user_name}: {message}")
                 await self._handle_chat_message(user_name, message)
                 
             except Exception as e:
-                logger.error(f"💥 [Handler {handler_id}] Error processing comment event: {e}")
-                logger.warning(f"⚠️ [Handler {handler_id}] Skipping fallback message to prevent duplicates")
+                logger.error(f"💥 [SINGLE Handler {handler_id}] Error processing comment event: {e}")
         
         @self.client.on(DisconnectEvent)
         async def on_disconnect(event):
             self.is_connected = False
-            logger.info(f"❌ [Handler {handler_id}] Disconnected from TikTok live stream")
+            logger.info(f"❌ [SINGLE Handler {handler_id}] Disconnected from TikTok live stream")
             
-            await websocket_manager.broadcast_json({
-                "type": "connection_status",
-                "connected": False,
-                "username": "",
-                "timestamp": datetime.now().isoformat()
-            })
+            if self._websocket_manager:
+                await self._websocket_manager.broadcast_json({
+                    "type": "connection_status",
+                    "connected": False,
+                    "username": "",
+                    "timestamp": datetime.now().isoformat()
+                })
         
-        logger.info(f"✅ Event handlers setup complete with ID: {handler_id}")
+        logger.info(f"✅ SINGLE event handler set complete with ID: {handler_id}")
     
     def _extract_user_name(self, event) -> str:
         """Extract user name from TikTok event safely"""
@@ -127,16 +186,7 @@ class TikTokService:
                           getattr(event.user, 'unique_id', 'Usuario Anónimo')))
         except Exception as user_error:
             logger.warning(f"⚠️ Error accessing event.user: {user_error}")
-            try:
-                # Fallback: try to access user_info directly
-                if hasattr(event, 'user_info') and event.user_info:
-                    user_info = event.user_info
-                    user_name = getattr(user_info, 'nickName', 
-                              getattr(user_info, 'displayName',
-                              getattr(user_info, 'uniqueId', 'Usuario Anónimo')))
-            except Exception as user_info_error:
-                logger.warning(f"⚠️ Error accessing event.user_info: {user_info_error}")
-                user_name = "Usuario Anónimo"
+            user_name = "Usuario Anónimo"
         
         return user_name
     
@@ -151,9 +201,6 @@ class TikTokService:
                 message = str(event.content) if event.content else "Mensaje vacío"
             elif hasattr(event, 'text'):
                 message = str(event.text) if event.text else "Mensaje vacío"
-            else:
-                logger.warning(f"⚠️ No comment content found in event")
-                message = "Mensaje sin contenido"
         except Exception as msg_error:
             logger.warning(f"⚠️ Error accessing message: {msg_error}")
             message = "Error al leer mensaje"
@@ -174,12 +221,13 @@ class TikTokService:
             # Handle specific TikTok errors
             error_message = self._format_error_message(e)
             
-            await websocket_manager.broadcast_json({
-                "type": "connection_status",
-                "connected": False,
-                "error": error_message,
-                "timestamp": datetime.now().isoformat()
-            })
+            if self._websocket_manager:
+                await self._websocket_manager.broadcast_json({
+                    "type": "connection_status",
+                    "connected": False,
+                    "error": error_message,
+                    "timestamp": datetime.now().isoformat()
+                })
     
     def _format_error_message(self, error) -> str:
         """Format error message for user display"""
@@ -198,175 +246,61 @@ class TikTokService:
         chat_message = ChatMessage(user=user, message=message, username_stream=self.username)
         
         # Broadcast to all connected clients
-        await websocket_manager.broadcast_json(chat_message.to_websocket_dict())
+        if self._websocket_manager:
+            await self._websocket_manager.broadcast_json(chat_message.to_websocket_dict())
         
         # Store in database
-        await db_service.save_chat_message(chat_message)
+        if self._db_service:
+            await self._db_service.save_chat_message(chat_message)
         
         logger.info(f"Chat message from {user}: {message}")
     
     async def disconnect_from_stream(self) -> bool:
         """Disconnect from TikTok Live stream with comprehensive cleanup"""
-        try:
-            logger.info("Starting comprehensive disconnect process...")
-            
-            # Set disconnected state immediately to prevent new connections
-            self.is_connected = False
-            
-            # Cancel the connection task with timeout
-            if self.connection_task and not self.connection_task.done():
-                logger.info("Cancelling connection task...")
-                self.connection_task.cancel()
-                try:
-                    await asyncio.wait_for(self.connection_task, timeout=3.0)
-                except (asyncio.CancelledError, asyncio.TimeoutError) as e:
-                    logger.info(f"Connection task handling: {type(e).__name__}")
-                except Exception as e:
-                    logger.warning(f"Error waiting for connection task cancellation: {e}")
-            
-            # Force stop the client with multiple methods and timeout
-            if self.client:
-                await self._force_client_disconnect()
-            
-            # Clear all event handlers to prevent callbacks
-            if self.client and hasattr(self.client, '_event_handlers'):
-                try:
-                    self.client._event_handlers.clear()
-                    logger.info("Cleared all event handlers")
-                except:
-                    pass
-            
-            # Reset all state variables
-            old_username = self.username
-            self.username = ""
-            self.client = None
-            self.connection_task = None
-            
-            # Force garbage collection
-            import gc
-            gc.collect()
-            
-            # Broadcast disconnection status
-            await websocket_manager.broadcast_json({
-                "type": "connection_status",
-                "connected": False,
-                "username": "",
-                "message": f"Desconectado completamente de @{old_username}" if old_username else "Desconectado",
-                "timestamp": datetime.now().isoformat()
-            })
-            
-            logger.info(f"Successfully and completely disconnected from TikTok live stream (@{old_username})")
-            
-            # Add a small delay to ensure all cleanup is complete
-            await asyncio.sleep(0.5)
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to disconnect: {e}")
-            # Even if there's an error, aggressively reset the state
-            await self._force_reset_state()
-            return True  # Return True since we've reset the state
-    
-    async def _force_client_disconnect(self):
-        """Force disconnect the TikTok client using multiple methods"""
-        try:
-            logger.info("Force stopping TikTok client...")
-            
-            # Try multiple disconnect methods with timeout
-            disconnect_tasks = []
-            
-            if hasattr(self.client, 'stop'):
-                disconnect_tasks.append(self.client.stop())
-            if hasattr(self.client, 'disconnect'):
-                disconnect_tasks.append(self.client.disconnect())
-            if hasattr(self.client, 'close'):
-                disconnect_tasks.append(self.client.close())
-            
-            # Execute all disconnect methods with timeout
-            if disconnect_tasks:
-                try:
-                    await asyncio.wait_for(
-                        asyncio.gather(*disconnect_tasks, return_exceptions=True),
-                        timeout=5.0
-                    )
-                    logger.info("TikTok client stopped successfully")
-                except asyncio.TimeoutError:
-                    logger.warning("Client disconnect timed out - forcing cleanup")
-                except Exception as e:
-                    logger.warning(f"Error during client disconnect methods: {e}")
-            
-            # Force cleanup connection objects if they exist  
-            if hasattr(self.client, '_websocket') and self.client._websocket:
-                try:
-                    await self.client._websocket.close()
-                except:
-                    pass
-            
-            if hasattr(self.client, '_connection') and self.client._connection:
-                try:
-                    self.client._connection.close()
-                except:
-                    pass
-                    
-        except Exception as e:
-            logger.warning(f"Error in comprehensive client shutdown: {e}")
-    
-    async def _force_reset_state(self):
-        """Force reset all state variables"""
-        self.is_connected = False
-        self.username = ""
-        self.client = None
-        self.connection_task = None
-        
-        # Still broadcast disconnection
-        try:
-            await websocket_manager.broadcast_json({
-                "type": "connection_status",
-                "connected": False,
-                "username": "",
-                "error": "Desconexión forzada debido a error - conexión limpiada",
-                "timestamp": datetime.now().isoformat()
-            })
-        except Exception as broadcast_error:
-            logger.error(f"Failed to broadcast disconnection: {broadcast_error}")
+        async with self._lock:
+            try:
+                logger.info("Starting comprehensive disconnect process...")
+                await self._force_cleanup()
+                
+                # Broadcast disconnection status
+                if self._websocket_manager:
+                    await self._websocket_manager.broadcast_json({
+                        "type": "connection_status",
+                        "connected": False,
+                        "username": "",
+                        "message": "Desconectado completamente",
+                        "timestamp": datetime.now().isoformat()
+                    })
+                
+                logger.info("Successfully and completely disconnected from TikTok live stream")
+                return True
+                
+            except Exception as e:
+                logger.error(f"Failed to disconnect: {e}")
+                return True  # Return True since we attempt to reset state
     
     async def force_disconnect(self) -> bool:
         """Force disconnect with aggressive cleanup"""
-        try:
-            logger.info("Force disconnect requested - performing aggressive cleanup")
-            
-            # Reset state immediately
-            self.is_connected = False
-            self.username = ""
-            
-            # Cancel tasks forcefully
-            if self.connection_task and not self.connection_task.done():
-                self.connection_task.cancel()
-            
-            # Set client to None
-            self.client = None
-            self.connection_task = None
-            
-            # Force garbage collection
-            import gc
-            gc.collect()
-            
-            # Broadcast forced disconnection
-            await websocket_manager.broadcast_json({
-                "type": "connection_status", 
-                "connected": False,
-                "username": "",
-                "message": "Desconexión forzada completada",
-                "timestamp": datetime.now().isoformat()
-            })
-            
-            logger.info("Force disconnect completed successfully")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error in force disconnect: {e}")
-            return True  # Return True since we attempt to reset state
+        async with self._lock:
+            try:
+                logger.info("Force disconnect requested - performing aggressive cleanup")
+                await self._force_cleanup()
+                
+                if self._websocket_manager:
+                    await self._websocket_manager.broadcast_json({
+                        "type": "connection_status", 
+                        "connected": False,
+                        "username": "",
+                        "message": "Desconexión forzada completada",
+                        "timestamp": datetime.now().isoformat()
+                    })
+                
+                logger.info("Force disconnect completed successfully")
+                return True
+                
+            except Exception as e:
+                logger.error(f"Error in force disconnect: {e}")
+                return True
 
-# Global TikTok service instance
+# Create singleton instance
 tiktok_service = TikTokService()
