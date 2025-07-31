@@ -163,11 +163,11 @@ function App() {
     
     try {
       while (ttsQueue.current.length > 0 && ttsEnabled) {
-        // Always take the LATEST message (last in queue)
-        const message = ttsQueue.current.pop(); // Use pop() to get the latest message
+        // Take the first message from queue (FIFO - First In, First Out)
+        const message = ttsQueue.current.shift(); // Use shift() to get the first message
         setTtsQueueLength(ttsQueue.current.length);
         
-        console.log(`🎤 Processing LATEST TTS message ${message.id}: "${message.text}" by ${message.user}`);
+        console.log(`🎤 Processing TTS message ${message.id}: "${message.text}" by ${message.user}`);
         
         try {
           // Wait for the current message to complete FULLY before proceeding
@@ -187,10 +187,9 @@ function App() {
           break;
         }
         
-        // After processing one message, check if new messages arrived
-        // If they did, we'll process the latest one in the next iteration
+        // Continue with next message in queue if available
         if (ttsQueue.current.length > 0) {
-          console.log(`📬 ${ttsQueue.current.length} new message(s) arrived, will process the latest one`);
+          console.log(`📬 ${ttsQueue.current.length} message(s) remaining in queue`);
         }
       }
     } catch (error) {
@@ -202,9 +201,9 @@ function App() {
       console.log(`🏁 TTS processing finished. Remaining messages: ${ttsQueue.current.length}`);
       
       // If there are still messages and TTS is enabled, continue processing
-      // This handles cases where new messages arrived while we were finishing
+      // This handles cases where new messages arrived while we were processing
       if (ttsQueue.current.length > 0 && ttsEnabled) {
-        console.log('🔄 More messages in queue, continuing with latest message...');
+        console.log('🔄 More messages in queue, continuing...');
         setTimeout(() => processTTSQueue(), 200);
       }
     }
