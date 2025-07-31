@@ -195,11 +195,10 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Fix TTS queue interruption issue"
-  stuck_tasks:
-    - "Fix TTS queue interruption issue"
+    - "Fix backend message duplication causing TTS to repeat messages"
+  stuck_tasks: []
   test_all: false
-  test_priority: "stuck_first"
+  test_priority: "high_first"
 
 agent_communication:
     - agent: "main"
