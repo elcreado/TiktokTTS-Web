@@ -228,6 +228,20 @@ class TikTokLiveBot:
                 # The fallback message was causing additional duplicate messages
                 logger.warning(f"⚠️ [Handler {handler_id}] Skipping fallback message to prevent duplicates")
         
+        @self.client.on(DisconnectEvent)
+        async def on_disconnect(event):
+            self.is_connected = False
+            logger.info(f"❌ [Handler {handler_id}] Disconnected from TikTok live stream")
+            
+            await manager.broadcast(json.dumps({
+                "type": "connection_status",
+                "connected": False,
+                "username": "",
+                "timestamp": datetime.now().isoformat()
+            }))
+        
+        logger.info(f"✅ Event handlers setup complete with ID: {handler_id}")
+        
         # Note: String-based event handlers cause 'str' object has no attribute 'get_type' error in TikTokLive 6.5.2
         # Only use event class-based handlers like CommentEvent, ConnectEvent, etc.
         # Commenting out string-based handlers until library issue is resolved
