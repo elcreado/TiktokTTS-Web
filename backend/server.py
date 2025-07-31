@@ -76,7 +76,7 @@ manager = ConnectionManager()
 
 # TikTok Live Integration
 from TikTokLive import TikTokLiveClient
-from TikTokLive.types.events import ConnectEvent, CommentEvent, DisconnectEvent, ViewerUpdateEvent
+from TikTokLive.events import ConnectEvent, CommentEvent, DisconnectEvent, ViewerUpdateEvent
 
 class TikTokLiveBot:
     def __init__(self):
