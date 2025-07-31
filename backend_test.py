@@ -351,6 +351,8 @@ class TikTokTTSBotTester:
         else:
             print("   ⚠️ Potential backend stability issue detected")
             return False
+
+    def test_websocket_connection(self):
         """Test WebSocket connection"""
         print(f"\n🔍 Testing WebSocket Connection...")
         
@@ -391,6 +393,91 @@ class TikTokTTSBotTester:
         except Exception as e:
             self.tests_run += 1
             print(f"❌ WebSocket test failed - Error: {str(e)}")
+            return False
+
+    def test_websocket_real_time_communication(self):
+        """Test WebSocket real-time communication with enhanced features"""
+        print(f"\n🔍 Testing WebSocket Real-time Communication...")
+        
+        # Clear previous messages
+        self.ws_messages = []
+        self.ws_connected = False
+        
+        # Convert HTTP URL to WebSocket URL
+        ws_url = self.base_url.replace("https://", "wss://").replace("http://", "ws://") + "/api/ws"
+        print(f"   WebSocket URL: {ws_url}")
+        
+        try:
+            # Create WebSocket connection
+            ws = websocket.WebSocketApp(
+                ws_url,
+                on_open=self.on_ws_open,
+                on_message=self.on_ws_message,
+                on_error=self.on_ws_error,
+                on_close=self.on_ws_close
+            )
+            
+            # Run WebSocket in a separate thread
+            ws_thread = threading.Thread(target=ws.run_forever)
+            ws_thread.daemon = True
+            ws_thread.start()
+            
+            # Wait for connection
+            time.sleep(2)
+            
+            if self.ws_connected:
+                print("   ✅ WebSocket connected successfully")
+                
+                # Test TTS toggle to generate WebSocket message
+                print("   🔊 Testing TTS toggle for WebSocket broadcast...")
+                tts_success, tts_data = self.run_test("TTS Toggle for WebSocket", "POST", "api/toggle-tts", 200)
+                
+                # Wait for WebSocket message
+                time.sleep(2)
+                
+                # Test disconnect to generate WebSocket message
+                print("   🔌 Testing disconnect for WebSocket broadcast...")
+                disconnect_success, disconnect_data = self.run_test("Disconnect for WebSocket", "POST", "api/disconnect", 200)
+                
+                # Wait for WebSocket message
+                time.sleep(2)
+                
+                print(f"   📨 Total WebSocket messages received: {len(self.ws_messages)}")
+                
+                # Analyze messages
+                message_types = []
+                for msg in self.ws_messages:
+                    try:
+                        parsed = json.loads(msg)
+                        msg_type = parsed.get('type', 'unknown')
+                        message_types.append(msg_type)
+                        print(f"   📋 Message type: {msg_type}")
+                    except:
+                        print(f"   📋 Raw message: {msg}")
+                
+                # Close connection
+                ws.close()
+                
+                # Evaluate success
+                expected_types = ['tts_status', 'connection_status']
+                success = any(msg_type in expected_types for msg_type in message_types)
+                
+                self.tests_run += 1
+                if success:
+                    self.tests_passed += 1
+                    print("✅ WebSocket real-time communication test passed")
+                    return True
+                else:
+                    print("❌ WebSocket real-time communication test failed - expected message types not received")
+                    return False
+            else:
+                self.tests_run += 1
+                print("❌ WebSocket real-time communication test failed - connection not established")
+                return False
+                
+        except Exception as e:
+            self.tests_run += 1
+            print(f"❌ WebSocket real-time communication test failed - Error: {str(e)}")
             return False
 
 def main():
