@@ -182,19 +182,28 @@ class TikTokLiveBot:
     
     async def disconnect_from_stream(self):
         try:
+            # Stop the client if it exists and is connected
             if self.client:
-                await self.client.stop()
+                try:
+                    await self.client.stop()
+                except Exception as e:
+                    logger.warning(f"Error stopping client (may not be connected): {e}")
             
+            # Cancel the connection task if it exists
             if self.connection_task:
                 self.connection_task.cancel()
                 try:
                     await self.connection_task
                 except asyncio.CancelledError:
                     pass
+                except Exception as e:
+                    logger.warning(f"Error cancelling connection task: {e}")
             
+            # Reset state
             self.is_connected = False
             self.username = ""
             self.client = None
+            self.connection_task = None
             
             await manager.broadcast(json.dumps({
                 "type": "connection_status",
@@ -208,7 +217,12 @@ class TikTokLiveBot:
             
         except Exception as e:
             logger.error(f"Failed to disconnect: {e}")
-            return False
+            # Even if there's an error, reset the state
+            self.is_connected = False
+            self.username = ""
+            self.client = None
+            self.connection_task = None
+            return True  # Return True since we've reset the state
     
     async def handle_chat_message(self, user: str, message: str):
         """Handle incoming chat messages from TikTok Live"""
