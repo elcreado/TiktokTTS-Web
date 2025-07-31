@@ -89,7 +89,6 @@ class TikTokLiveBot:
             # Initialize TikTok Live client
             self.client = TikTokLiveClient(
                 unique_id=clean_username,
-                debug=True,
                 process_initial_data=False,
                 enable_extended_gift_info=True,
                 polling_interval_ms=1000
