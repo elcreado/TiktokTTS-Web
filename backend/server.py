@@ -139,10 +139,14 @@ class TikTokLiveBot:
     def setup_event_handlers(self):
         """Set up all TikTok Live event handlers"""
         
+        # Generate unique handler ID for debugging
+        handler_id = datetime.now().strftime("%H:%M:%S.%f")
+        logger.info(f"🔧 Setting up event handlers with ID: {handler_id}")
+        
         @self.client.on(ConnectEvent)
         async def on_connect(event):
             self.is_connected = True
-            logger.info(f"✅ Successfully connected to live stream!")
+            logger.info(f"✅ [Handler {handler_id}] Successfully connected to live stream!")
             logger.info(f"📡 Connection event details: {event}")
             
             await manager.broadcast(json.dumps({
@@ -155,7 +159,7 @@ class TikTokLiveBot:
         @self.client.on(CommentEvent)
         async def on_comment(event):
             try:
-                logger.info(f"🔍 Raw comment event received: {type(event)}")
+                logger.info(f"🔍 [Handler {handler_id}] Raw comment event received: {type(event)}")
                 logger.info(f"🔍 Event attributes: {dir(event)}")
                 
                 # Try to get user info safely with fallback options
@@ -213,18 +217,16 @@ class TikTokLiveBot:
                     logger.warning(f"⚠️ Error accessing message: {msg_error}")
                     message = "Error al leer mensaje"
                 
-                logger.info(f"💬 Comentario procesado - {user_name}: {message}")
+                logger.info(f"💬 [Handler {handler_id}] Comentario procesado - {user_name}: {message}")
                 await self.handle_chat_message(user_name, message)
                 
             except Exception as e:
-                logger.error(f"💥 Error processing comment event: {e}")
+                logger.error(f"💥 [Handler {handler_id}] Error processing comment event: {e}")
                 logger.error(f"💥 Error type: {type(e)}")
                 logger.error(f"💥 Event type: {type(event)}")
-                # Try to process with minimal info to avoid complete failure
-                try:
-                    await self.handle_chat_message("Usuario Desconocido", "Mensaje no procesable")
-                except Exception as fallback_error:
-                    logger.error(f"💥 Fallback comment processing also failed: {fallback_error}")
+                # REMOVED FALLBACK MESSAGE TO PREVENT DUPLICATES
+                # The fallback message was causing additional duplicate messages
+                logger.warning(f"⚠️ [Handler {handler_id}] Skipping fallback message to prevent duplicates")
         
         # Note: String-based event handlers cause 'str' object has no attribute 'get_type' error in TikTokLive 6.5.2
         # Only use event class-based handlers like CommentEvent, ConnectEvent, etc.
