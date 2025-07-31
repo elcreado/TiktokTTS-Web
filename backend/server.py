@@ -241,17 +241,18 @@ class TikTokLiveBot:
                 "timestamp": datetime.now().isoformat()
             }))
         
-        # Add a general event listener to see all events
-        @self.client.on("*")
-        async def on_any_event(event_name, event_data=None):
-            if event_name not in ['connect', 'disconnect']:
-                logger.info(f"🌟 Any event captured: {event_name} - Type: {type(event_data) if event_data else 'None'}")
-                if 'comment' in event_name.lower() or 'message' in event_name.lower():
-                    logger.info(f"🌟 Potential message event: {event_name} - {event_data}")
-                    try:
-                        await self.handle_chat_message(f"Usuario ({event_name})", str(event_data))
-                    except Exception as e:
-                        logger.error(f"💥 Error handling any event: {e}")
+        # Note: Wildcard event handler ("*") causes 'str' object has no attribute 'get_type' error in TikTokLive 6.5.2
+        # Commenting out until library issue is resolved
+        # @self.client.on("*")
+        # async def on_any_event(event_name, event_data=None):
+        #     if event_name not in ['connect', 'disconnect']:
+        #         logger.info(f"🌟 Any event captured: {event_name} - Type: {type(event_data) if event_data else 'None'}")
+        #         if 'comment' in event_name.lower() or 'message' in event_name.lower():
+        #             logger.info(f"🌟 Potential message event: {event_name} - {event_data}")
+        #             try:
+        #                 await self.handle_chat_message(f"Usuario ({event_name})", str(event_data))
+        #             except Exception as e:
+        #                 logger.error(f"💥 Error handling any event: {e}")
     
     async def start_client(self):
         """Start the TikTok Live client"""
