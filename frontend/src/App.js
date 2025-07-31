@@ -545,24 +545,37 @@ function App() {
                       )}
                     </Button>
                   ) : (
-                    <Button 
-                      onClick={disconnectFromTikTok}
-                      disabled={isLoading}
-                      variant="destructive"
-                      className="flex-1"
-                    >
-                      {isLoading ? (
-                        <>
-                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                          Desconectando...
-                        </>
-                      ) : (
-                        <>
-                          <Pause className="w-4 h-4 mr-2" />
-                          Desconectar
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex space-x-2 w-full">
+                      <Button 
+                        onClick={() => disconnectFromTikTok(false)}
+                        disabled={isLoading}
+                        variant="destructive"
+                        className="flex-1"
+                      >
+                        {isLoading ? (
+                          <>
+                            <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                            Desconectando...
+                          </>
+                        ) : (
+                          <>
+                            <Pause className="w-4 h-4 mr-2" />
+                            Desconectar
+                          </>
+                        )}
+                      </Button>
+                      
+                      <Button 
+                        onClick={() => disconnectFromTikTok(true)}
+                        disabled={isLoading}
+                        variant="outline"
+                        size="sm"
+                        className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                        title="Desconexión forzada si la normal no funciona"
+                      >
+                        ⚡
+                      </Button>
+                    </div>
                   )}
                 </div>
               </CardContent>
