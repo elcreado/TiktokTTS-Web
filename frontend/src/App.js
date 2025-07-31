@@ -68,7 +68,7 @@ function App() {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = BACKEND_URL.replace(/^https?:/, wsProtocol) + '/ws';
+    const wsUrl = BACKEND_URL.replace(/^https?:/, wsProtocol) + '/api/ws';
     
     wsRef.current = new WebSocket(wsUrl);
 
