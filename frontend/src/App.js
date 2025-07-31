@@ -454,7 +454,7 @@ function App() {
               </CardHeader>
               
               <CardContent className="flex-1 overflow-hidden p-0">
-                <ScrollArea className="h-full px-6 pb-4">
+                <ScrollArea ref={scrollAreaRef} className="h-full px-6 pb-4">
                   {chatMessages.length === 0 ? (
                     <div className="flex items-center justify-center h-[400px] text-gray-400">
                       <div className="text-center">
@@ -490,6 +490,13 @@ function App() {
                           <p className="text-white text-sm leading-relaxed break-words">{msg.message}</p>
                         </div>
                       ))}
+                      {chatMessages.length >= MAX_MESSAGES && (
+                        <div className="text-center py-4">
+                          <p className="text-xs text-gray-500">
+                            Mostrando los últimos {MAX_MESSAGES} mensajes
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </ScrollArea>
