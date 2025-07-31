@@ -34,9 +34,13 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   
+  // Constants
+  const MAX_MESSAGES = 100; // Límite de mensajes para optimizar rendimiento
+  
   // Refs
   const wsRef = useRef(null);
-  const chatEndRef = useRef(null);
+  const scrollAreaRef = useRef(null);
+  const shouldAutoScroll = useRef(true);
 
   // TTS Setup
   const speak = (text, user) => {
