@@ -1,6 +1,4 @@
-<file>
-      <absolute_file_name>/app/backend/server_new.py</absolute_file_name>
-      <content">"""
+"""
 TikTok Live TTS Bot - Refactored Server
 A modular FastAPI application for TikTok Live stream TTS integration.
 
@@ -91,5 +89,3 @@ if __name__ == "__main__":
         port=settings.PORT,
         reload=True  # Enable hot reload for development
     )
-</content>
-    </file>
