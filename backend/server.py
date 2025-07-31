@@ -164,10 +164,19 @@ class TikTokLiveBot:
             logger.error(f"Error starting TikTok client: {e}")
             self.is_connected = False
             
+            # Handle specific TikTok errors
+            error_message = str(e)
+            if "UserOfflineError" in str(type(e)) or "No Message Provided" in error_message:
+                error_message = f"@{self.username} is not currently live. Please try again when they start streaming."
+            elif "Failed to parse room ID" in error_message:
+                error_message = f"Could not find live stream for @{self.username}. Please check the username and try again."
+            else:
+                error_message = f"Failed to connect to @{self.username}'s live stream: {error_message}"
+            
             await manager.broadcast(json.dumps({
                 "type": "connection_status",
                 "connected": False,
-                "error": f"No se pudo conectar al live de @{self.username}. Verifica que esté transmitiendo en vivo.",
+                "error": error_message,
                 "timestamp": datetime.now().isoformat()
             }))
     
