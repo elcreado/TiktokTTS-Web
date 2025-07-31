@@ -193,7 +193,7 @@ class TikTokLiveBot:
     async def disconnect_from_stream(self):
         try:
             if self.client:
-                await self.client.disconnect()
+                await self.client.stop()
             
             if self.connection_task:
                 self.connection_task.cancel()
