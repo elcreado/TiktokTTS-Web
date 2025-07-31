@@ -94,17 +94,20 @@ class TikTokLiveBot:
             sing_api_key = os.environ.get('SING_API_KEY', '')
             logger.info(f"Using SING_API_KEY: {sing_api_key[:20]}..." if sing_api_key else "No SING_API_KEY found")
             
-            # Initialize TikTok Live client with minimal valid configuration
+            # Initialize TikTok Live client with configuration similar to your working JavaScript code
             self.client = TikTokLiveClient(
                 unique_id=clean_username,
-                process_initial_data=False
-            )
-            
-            # Add custom headers if the client supports it
-            if hasattr(self.client, 'set_headers'):
-                self.client.set_headers({
+                process_initial_data=False,
+                fetch_room_info_on_connect=True,
+                enable_extended_gift_info=True,
+                ping_interval_ms=2000,  # Similar to requestPollingIntervalMs: 2000
+                headers={
                     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
-                })
+                },
+                websocket_enabled=True,
+                sign_api_key=sing_api_key if sing_api_key else None,
+                lang="en-US"
+            )
             
             # Set up event handlers
             self.setup_event_handlers()
