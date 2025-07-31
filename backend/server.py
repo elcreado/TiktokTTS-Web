@@ -94,12 +94,25 @@ class TikTokLiveBot:
             sing_api_key = os.environ.get('SING_API_KEY', '')
             logger.info(f"Using SING_API_KEY: {sing_api_key[:20]}..." if sing_api_key else "No SING_API_KEY found")
             
+            # Clear any existing client and handlers to prevent duplicates
+            if self.client:
+                logger.info("🧹 Clearing existing client and event handlers to prevent duplicates")
+                try:
+                    # Clear event handlers if they exist
+                    if hasattr(self.client, '_event_handlers'):
+                        self.client._event_handlers.clear()
+                    # Cancel existing connection task if running
+                    if self.connection_task and not self.connection_task.done():
+                        self.connection_task.cancel()
+                except Exception as cleanup_error:
+                    logger.warning(f"⚠️ Error during client cleanup: {cleanup_error}")
+            
             # Initialize TikTok Live client with basic configuration for 6.5.2
             self.client = TikTokLiveClient(
                 unique_id=clean_username
             )
             
-            # Set up event handlers
+            # Set up event handlers (now on clean client)
             self.setup_event_handlers()
             
             # Start connection in background
