@@ -182,51 +182,106 @@ class TikTokLiveBot:
     
     async def disconnect_from_stream(self):
         try:
-            logger.info("Starting disconnect process...")
+            logger.info("Starting comprehensive disconnect process...")
             
-            # First, cancel the connection task to stop trying to reconnect
+            # Set disconnected state immediately to prevent new connections
+            self.is_connected = False
+            
+            # First, cancel the connection task with timeout
             if self.connection_task and not self.connection_task.done():
                 logger.info("Cancelling connection task...")
                 self.connection_task.cancel()
                 try:
-                    await self.connection_task
+                    # Wait for cancellation with timeout
+                    await asyncio.wait_for(self.connection_task, timeout=3.0)
                 except asyncio.CancelledError:
                     logger.info("Connection task cancelled successfully")
+                except asyncio.TimeoutError:
+                    logger.warning("Connection task cancellation timed out")
                 except Exception as e:
                     logger.warning(f"Error waiting for connection task cancellation: {e}")
             
-            # Then stop the client if it exists and is connected
+            # Force stop the client with multiple methods and timeout
             if self.client:
                 try:
-                    logger.info("Stopping TikTok client...")
+                    logger.info("Force stopping TikTok client...")
+                    
+                    # Try multiple disconnect methods with timeout
+                    disconnect_tasks = []
+                    
                     if hasattr(self.client, 'stop'):
-                        await self.client.stop()
-                    elif hasattr(self.client, 'disconnect'):
-                        await self.client.disconnect()
-                    logger.info("TikTok client stopped successfully")
+                        disconnect_tasks.append(self.client.stop())
+                    if hasattr(self.client, 'disconnect'):
+                        disconnect_tasks.append(self.client.disconnect())
+                    if hasattr(self.client, 'close'):
+                        disconnect_tasks.append(self.client.close())
+                    
+                    # Execute all disconnect methods with timeout
+                    if disconnect_tasks:
+                        try:
+                            await asyncio.wait_for(
+                                asyncio.gather(*disconnect_tasks, return_exceptions=True),
+                                timeout=5.0
+                            )
+                            logger.info("TikTok client stopped successfully")
+                        except asyncio.TimeoutError:
+                            logger.warning("Client disconnect timed out - forcing cleanup")
+                        except Exception as e:
+                            logger.warning(f"Error during client disconnect methods: {e}")
+                    
+                    # Force cleanup connection objects if they exist
+                    if hasattr(self.client, '_websocket') and self.client._websocket:
+                        try:
+                            await self.client._websocket.close()
+                        except:
+                            pass
+                    
+                    if hasattr(self.client, '_connection') and self.client._connection:
+                        try:
+                            self.client._connection.close()
+                        except:
+                            pass
+                            
                 except Exception as e:
-                    logger.warning(f"Error stopping client: {e}")
+                    logger.warning(f"Error in comprehensive client shutdown: {e}")
+            
+            # Clear all event handlers to prevent callbacks
+            if self.client and hasattr(self.client, '_event_handlers'):
+                try:
+                    self.client._event_handlers.clear()
+                    logger.info("Cleared all event handlers")
+                except:
+                    pass
             
             # Reset all state variables
-            self.is_connected = False
+            old_username = self.username
             self.username = ""
             self.client = None
             self.connection_task = None
+            
+            # Force garbage collection
+            import gc
+            gc.collect()
             
             # Broadcast disconnection status
             await manager.broadcast(json.dumps({
                 "type": "connection_status",
                 "connected": False,
                 "username": "",
+                "message": f"Desconectado completamente de @{old_username}" if old_username else "Desconectado",
                 "timestamp": datetime.now().isoformat()
             }))
             
-            logger.info("Successfully disconnected from TikTok live stream")
+            logger.info(f"Successfully and completely disconnected from TikTok live stream (@{old_username})")
+            
+            # Add a small delay to ensure all cleanup is complete
+            await asyncio.sleep(0.5)
+            
             return True
             
         except Exception as e:
             logger.error(f"Failed to disconnect: {e}")
-            # Even if there's an error, reset the state to prevent stuck connections
+            # Even if there's an error, aggressively reset the state to prevent stuck connections
             self.is_connected = False
             self.username = ""
             self.client = None
@@ -238,7 +293,7 @@ class TikTokLiveBot:
                     "type": "connection_status",
                     "connected": False,
                     "username": "",
-                    "error": "Desconexión forzada debido a error",
+                    "error": "Desconexión forzada debido a error - conexión limpiada",
                     "timestamp": datetime.now().isoformat()
                 }))
             except Exception as broadcast_error:
