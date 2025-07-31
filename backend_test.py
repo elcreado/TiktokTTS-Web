@@ -81,9 +81,10 @@ class TikTokTTSBotTester:
 
     def test_connect_valid_username(self):
         """Test connect with valid username (will likely fail as user may not be live)"""
-        test_username = "testuser123"
+        # Use a more realistic TikTok username that might be live
+        test_username = "charlidamelio"  # Popular TikTok user
         success, response = self.run_test(
-            "Connect with Test Username",
+            "Connect with Popular Username",
             "POST",
             "api/connect",
             200,  # We expect 200 even if connection fails, as the API accepts the request
