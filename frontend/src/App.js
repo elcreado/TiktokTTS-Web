@@ -33,6 +33,8 @@ function App() {
   const [chatMessages, setChatMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [ttsQueueLength, setTtsQueueLength] = useState(0);
+  const [isProcessingTTSState, setIsProcessingTTSState] = useState(false);
   
   // Constants
   const MAX_MESSAGES = 100; // Límite de mensajes para optimizar rendimiento
