@@ -47,7 +47,7 @@ function App() {
   const ttsQueue = useRef([]);
   const isProcessingTTS = useRef(false);
 
-  // TTS Setup with Improved Sequential Processing (Latest Message Priority)
+  // TTS Setup with Improved Sequential Processing
   const speak = (text, user) => {
     if (!ttsEnabled || !window.speechSynthesis) return Promise.resolve();
     
@@ -68,45 +68,49 @@ function App() {
         utterance.voice = spanishVoice;
       }
       
-      // Set up event handlers for reliable completion detection
-      let resolved = false;
+      // Simple event handlers to prevent duplication
+      let hasResolved = false;
       
-      const resolveOnce = () => {
-        if (!resolved) {
-          resolved = true;
+      const handleEnd = () => {
+        if (!hasResolved) {
+          hasResolved = true;
+          console.log(`✅ TTS completed: "${text}" by ${user}`);
           resolve();
         }
       };
       
-      // Handle completion and errors
-      utterance.onend = resolveOnce;
-      utterance.onerror = (error) => {
-        console.warn('TTS error:', error);
-        resolveOnce();
-      };
-      
-      // Fallback timeout to prevent hanging (but generous to allow full completion)
-      const timeout = setTimeout(() => {
-        if (!resolved) {
-          console.warn('TTS timeout reached, but may still be playing');
-          resolveOnce();
+      const handleError = (error) => {
+        if (!hasResolved) {
+          hasResolved = true;
+          console.warn('TTS error:', error);
+          resolve();
         }
-      }, Math.max(text.length * 120, 5000)); // Generous timeout for full message
-      
-      // Clear timeout when speech ends naturally
-      const originalOnEnd = utterance.onend;
-      utterance.onend = () => {
-        clearTimeout(timeout);
-        if (originalOnEnd) originalOnEnd();
       };
+      
+      utterance.onend = handleEnd;
+      utterance.onerror = handleError;
+      
+      // Safety timeout to prevent hanging
+      const timeout = setTimeout(() => {
+        if (!hasResolved) {
+          hasResolved = true;
+          console.warn('TTS timeout reached, resolving...');
+          resolve();
+        }
+      }, Math.max(text.length * 100, 3000)); // Adjusted timeout
       
       try {
         console.log(`🎤 Starting TTS: "${text}" by ${user}`);
         window.speechSynthesis.speak(utterance);
+        
+        // Clear timeout when speech ends naturally
+        utterance.addEventListener('end', () => {
+          clearTimeout(timeout);
+        });
+        
       } catch (error) {
-        console.error('Error speaking utterance:', error);
         clearTimeout(timeout);
-        resolveOnce();
+        handleError(error);
       }
     });
   };
