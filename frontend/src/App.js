@@ -381,6 +381,7 @@ function App() {
             setCurrentUsername(data.username);
             setConnectionStatus('tiktok_connected');
             toast.success(`Conectado a @${data.username}`);
+            setUserDisconnected(false); // Reset flag on successful connection
           } else {
             setCurrentUsername('');
             setConnectionStatus('disconnected');
