@@ -35,6 +35,7 @@ function App() {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [ttsQueueLength, setTtsQueueLength] = useState(0);
   const [isProcessingTTSState, setIsProcessingTTSState] = useState(false);
+  const [userDisconnected, setUserDisconnected] = useState(false); // Flag to prevent auto-reconnect
   
   // Constants
   const MAX_MESSAGES = 100; // Límite de mensajes para optimizar rendimiento
