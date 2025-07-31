@@ -111,6 +111,10 @@ class TikTokLiveBot:
             
         except Exception as e:
             logger.error(f"Failed to connect to TikTok live: {e}")
+            logger.error(f"Error type: {type(e)}")
+            # Add full traceback for debugging
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
             await manager.broadcast(json.dumps({
                 "type": "connection_status",
                 "connected": False,
