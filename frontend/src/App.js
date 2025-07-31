@@ -633,6 +633,34 @@ function App() {
                     <div className="text-xs text-gray-300">Conexiones</div>
                   </div>
                 </div>
+                
+                {/* TTS Queue Status */}
+                {ttsEnabled && (
+                  <div className="mt-4 pt-4 border-t border-white/10">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-300">Cola TTS:</span>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-white font-medium">{ttsQueueLength}</span>
+                        {isProcessingTTSState && (
+                          <div className="w-3 h-3 animate-pulse bg-green-500 rounded-full" title="Procesando TTS"></div>
+                        )}
+                      </div>
+                    </div>
+                    {ttsQueueLength > 0 && (
+                      <div className="mt-2">
+                        <div className="w-full bg-gray-700 rounded-full h-1.5">
+                          <div 
+                            className="bg-gradient-to-r from-blue-500 to-purple-500 h-1.5 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min((ttsQueueLength / MAX_TTS_QUEUE) * 100, 100)}%` }}
+                          ></div>
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {isProcessingTTSState ? 'Reproduciendo...' : 'En espera'}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
