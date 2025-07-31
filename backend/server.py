@@ -138,6 +138,9 @@ class TikTokLiveBot:
         @self.client.on(CommentEvent)
         async def on_comment(event):
             try:
+                logger.info(f"🔍 Raw comment event received: {type(event)}")
+                logger.info(f"🔍 Event attributes: {dir(event)}")
+                
                 # Try to get user info safely with fallback options
                 user_name = "Usuario Anónimo"
                 message = "Mensaje sin contenido"
@@ -145,57 +148,91 @@ class TikTokLiveBot:
                 # Multiple fallback methods to get user name
                 try:
                     if hasattr(event, 'user') and event.user:
+                        logger.info(f"🔍 Found event.user: {type(event.user)}")
                         user_name = getattr(event.user, 'nickname', 
                                   getattr(event.user, 'display_name', 
                                   getattr(event.user, 'unique_id', 'Usuario Anónimo')))
-                except Exception:
+                except Exception as user_error:
+                    logger.warning(f"⚠️ Error accessing event.user: {user_error}")
                     try:
                         # Fallback: try to access user_info directly
                         if hasattr(event, 'user_info') and event.user_info:
+                            logger.info(f"🔍 Found event.user_info: {type(event.user_info)}")
                             user_info = event.user_info
                             user_name = getattr(user_info, 'nickName', 
                                       getattr(user_info, 'displayName',
                                       getattr(user_info, 'uniqueId', 'Usuario Anónimo')))
-                    except Exception:
+                    except Exception as user_info_error:
+                        logger.warning(f"⚠️ Error accessing event.user_info: {user_info_error}")
                         try:
-                            # Last fallback: try raw data access
-                            if hasattr(event, 'data') and event.data:
-                                user_data = getattr(event.data, 'user', None)
-                                if user_data:
-                                    user_name = getattr(user_data, 'nickName', 
-                                              getattr(user_data, 'displayName',
-                                              getattr(user_data, 'uniqueId', 'Usuario Anónimo')))
-                        except Exception:
+                            # Try raw protobuf access
+                            if hasattr(event, '_raw_data'):
+                                raw_data = event._raw_data
+                                logger.info(f"🔍 Found raw_data: {raw_data}")
+                                if 'user' in raw_data:
+                                    user_data = raw_data['user']
+                                    user_name = user_data.get('nickName', 
+                                              user_data.get('displayName',
+                                              user_data.get('uniqueId', 'Usuario Anónimo')))
+                        except Exception as raw_error:
+                            logger.warning(f"⚠️ Error accessing raw data: {raw_error}")
                             user_name = "Usuario Anónimo"
                 
                 # Get comment text safely
                 try:
                     if hasattr(event, 'comment'):
                         message = str(event.comment) if event.comment else "Mensaje vacío"
+                        logger.info(f"🔍 Found event.comment: {message}")
                     elif hasattr(event, 'content'):
                         message = str(event.content) if event.content else "Mensaje vacío"
+                        logger.info(f"🔍 Found event.content: {message}")
                     elif hasattr(event, 'text'):
                         message = str(event.text) if event.text else "Mensaje vacío"
+                        logger.info(f"🔍 Found event.text: {message}")
                     else:
+                        logger.warning(f"⚠️ No comment content found in event")
                         message = "Mensaje sin contenido"
-                except Exception:
+                except Exception as msg_error:
+                    logger.warning(f"⚠️ Error accessing message: {msg_error}")
                     message = "Error al leer mensaje"
                 
-                logger.info(f"💬 Comentario recibido - {user_name}: {message}")
+                logger.info(f"💬 Comentario procesado - {user_name}: {message}")
                 await self.handle_chat_message(user_name, message)
                 
             except Exception as e:
-                logger.error(f"Error processing comment event: {e}")
+                logger.error(f"💥 Error processing comment event: {e}")
+                logger.error(f"💥 Error type: {type(e)}")
+                logger.error(f"💥 Event type: {type(event)}")
                 # Try to process with minimal info to avoid complete failure
                 try:
                     await self.handle_chat_message("Usuario Desconocido", "Mensaje no procesable")
                 except Exception as fallback_error:
-                    logger.error(f"Fallback comment processing also failed: {fallback_error}")
+                    logger.error(f"💥 Fallback comment processing also failed: {fallback_error}")
+        
+        # Let's also try capturing other events that might contain messages
+        @self.client.on("comment")
+        async def on_comment_string(event):
+            try:
+                logger.info(f"🎯 String-based comment event: {type(event)}")
+                logger.info(f"🎯 Event: {event}")
+                await self.handle_chat_message("Usuario (String Event)", str(event))
+            except Exception as e:
+                logger.error(f"💥 Error in string comment handler: {e}")
+        
+        # Try to capture any event that might be related to messages
+        @self.client.on("live_comment")
+        async def on_live_comment(event):
+            try:
+                logger.info(f"📝 Live comment event: {type(event)}")
+                logger.info(f"📝 Event: {event}")
+                await self.handle_chat_message("Usuario (Live Comment)", str(event))
+            except Exception as e:
+                logger.error(f"💥 Error in live comment handler: {e}")
         
         @self.client.on(DisconnectEvent)
         async def on_disconnect(event):
             self.is_connected = False
-            logger.info("Disconnected from TikTok live stream")
+            logger.info("❌ Disconnected from TikTok live stream")
             
             await manager.broadcast(json.dumps({
                 "type": "connection_status",
@@ -203,6 +240,18 @@ class TikTokLiveBot:
                 "username": "",
                 "timestamp": datetime.now().isoformat()
             }))
+        
+        # Add a general event listener to see all events
+        @self.client.on("*")
+        async def on_any_event(event_name, event_data=None):
+            if event_name not in ['connect', 'disconnect']:
+                logger.info(f"🌟 Any event captured: {event_name} - Type: {type(event_data) if event_data else 'None'}")
+                if 'comment' in event_name.lower() or 'message' in event_name.lower():
+                    logger.info(f"🌟 Potential message event: {event_name} - {event_data}")
+                    try:
+                        await self.handle_chat_message(f"Usuario ({event_name})", str(event_data))
+                    except Exception as e:
+                        logger.error(f"💥 Error handling any event: {e}")
     
     async def start_client(self):
         """Start the TikTok Live client"""
