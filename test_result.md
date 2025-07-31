@@ -161,20 +161,17 @@ backend:
 
 frontend:
 frontend:
-  - task: "Investigate TTS message duplication issue in frontend"
+  - task: "Fix TikTok disconnect button not properly disconnecting server connection"
     implemented: true
     working: true
     file: "/app/frontend/src/App.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
         - working: "NA"
           agent: "main"
-          comment: "User reported TTS messages playing twice despite backend fixes. Need to investigate frontend TTS queue logic, WebSocket message handling, and Speech Synthesis API behavior to identify root cause of duplication."
-        - working: true
-          agent: "testing"
-          comment: "✅ COMPREHENSIVE FRONTEND TTS ANALYSIS COMPLETED: The frontend TTS code is NOT causing message duplication. Key findings: 1) TTS QUEUE LOGIC PERFECT: addToTTSQueue() called exactly once per message, processTTSQueue() processes sequentially without duplication, smart queue management working correctly. 2) NO MESSAGE DUPLICATION: 3 test messages → 3 'NEW MESSAGE RECEIVED' → 3 'Starting TTS' → 3 'Completed TTS' (perfect 1:1:1 ratio), unique message IDs confirm no duplication. 3) WEBSOCKET HANDLING CORRECT: Each message processed once, no duplicate reception. 4) ROOT CAUSE IDENTIFIED: Browser Speech Synthesis API errors ('SpeechSynthesisErrorEvent' on every TTS attempt) may cause user perception of double playback. 5) CONCLUSION: Frontend TTS implementation is correct. The reported 'messages playing twice' issue is likely at the browser Speech Synthesis API level, not in the application code. The frontend queue management, message processing, and speak() function are all working perfectly with no code-level duplication."
+          comment: "User reported that disconnect button doesn't properly disconnect TikTok server connection. Root cause identified: WebSocket automatically reconnects after 3 seconds even when user explicitly disconnects, making it appear that disconnection didn't work. Fixed by adding userDisconnected flag to prevent automatic WebSocket reconnection when user explicitly disconnects, and immediately updating frontend state after successful disconnection to provide instant feedback."
 
   - task: "Verify frontend TikTok connection interface"
     implemented: true
