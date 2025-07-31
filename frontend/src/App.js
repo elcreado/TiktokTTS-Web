@@ -45,11 +45,9 @@ function App() {
   const ttsQueue = useRef([]);
   const isProcessingTTS = useRef(false);
 
-  // TTS Setup
+  // TTS Setup with Queue System
   const speak = (text, user) => {
     if (!ttsEnabled || !window.speechSynthesis) return;
-    
-    window.speechSynthesis.cancel(); // Cancel any ongoing speech
     
     const utterance = new SpeechSynthesisUtterance(`${user} dice: ${text}`);
     utterance.lang = 'es-ES'; // Spanish language
@@ -67,7 +65,56 @@ function App() {
       utterance.voice = spanishVoice;
     }
     
-    window.speechSynthesis.speak(utterance);
+    return new Promise((resolve) => {
+      utterance.onend = () => {
+        resolve();
+      };
+      utterance.onerror = () => {
+        resolve(); // Resolve even on error to continue processing queue
+      };
+      
+      window.speechSynthesis.speak(utterance);
+    });
+  };
+
+  // TTS Queue Management
+  const addToTTSQueue = (text, user) => {
+    if (!ttsEnabled) return;
+    
+    // Add to queue but limit size to prevent excessive accumulation
+    if (ttsQueue.current.length < MAX_TTS_QUEUE) {
+      ttsQueue.current.push({ text, user, timestamp: Date.now() });
+      processTTSQueue();
+    } else {
+      console.log('TTS queue full, skipping message:', { text, user });
+    }
+  };
+
+  const processTTSQueue = async () => {
+    if (isProcessingTTS.current || ttsQueue.current.length === 0) return;
+    
+    isProcessingTTS.current = true;
+    
+    while (ttsQueue.current.length > 0 && ttsEnabled) {
+      const message = ttsQueue.current.shift();
+      
+      try {
+        await speak(message.text, message.user);
+        // Small delay between messages for better listening experience
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error('Error in TTS:', error);
+      }
+    }
+    
+    isProcessingTTS.current = false;
+  };
+
+  // Clear TTS queue when TTS is disabled
+  const clearTTSQueue = () => {
+    ttsQueue.current = [];
+    window.speechSynthesis.cancel();
+    isProcessingTTS.current = false;
   };
 
   // WebSocket Setup
