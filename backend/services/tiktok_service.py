@@ -91,9 +91,9 @@ class TikTokService:
                 except Exception as e:
                     logger.warning(f"Error cancelling connection task: {e}")
             
-            # Force stop the client
+            # Force stop the client with aggressive connection termination
             if self.client:
-                logger.info("Force stopping existing TikTok client...")
+                logger.info("🔥 AGGRESSIVE DISCONNECT: Force stopping existing TikTok client...")
                 try:
                     # Clear event handlers immediately
                     if hasattr(self.client, '_event_handlers'):
@@ -101,16 +101,51 @@ class TikTokService:
                         logger.info(f"Clearing {handler_count} existing event handlers")
                         self.client._event_handlers.clear()
                     
-                    # Try to stop the client
-                    if hasattr(self.client, 'stop'):
-                        await asyncio.wait_for(self.client.stop(), timeout=3.0)
-                    
-                    # Clean up websocket connections
+                    # AGGRESSIVE FIX: Close WebSocket connection directly first
                     if hasattr(self.client, '_websocket') and self.client._websocket:
-                        await self.client._websocket.close()
+                        logger.info("🔌 Closing WebSocket connection directly...")
+                        try:
+                            await asyncio.wait_for(self.client._websocket.close(), timeout=1.0)
+                            logger.info("✅ WebSocket closed directly")
+                        except Exception as ws_error:
+                            logger.warning(f"Error closing WebSocket directly: {ws_error}")
+                    
+                    # Try to close any other connection attributes
+                    if hasattr(self.client, '_connection') and self.client._connection:
+                        logger.info("🔌 Closing connection attribute...")
+                        try:
+                            await self.client._connection.close()
+                        except Exception as conn_error:
+                            logger.warning(f"Error closing connection: {conn_error}")
+                    
+                    # Now try the standard stop method with timeout
+                    if hasattr(self.client, 'stop'):
+                        logger.info("⏱️ Calling client.stop() with timeout...")
+                        try:
+                            await asyncio.wait_for(self.client.stop(), timeout=2.0)
+                            logger.info("✅ Client.stop() completed")
+                        except asyncio.TimeoutError:
+                            logger.warning("⏰ Client.stop() timed out - continuing with force cleanup")
+                        except Exception as stop_error:
+                            logger.warning(f"Error in client.stop(): {stop_error}")
+                    
+                    # Final cleanup - close any remaining connections
+                    connection_attrs = ['_websocket', '_connection', 'websocket', 'connection']
+                    for attr in connection_attrs:
+                        if hasattr(self.client, attr):
+                            conn = getattr(self.client, attr)
+                            if conn and hasattr(conn, 'close'):
+                                try:
+                                    await conn.close()
+                                    logger.info(f"✅ Closed {attr}")
+                                except Exception as e:
+                                    logger.warning(f"Error closing {attr}: {e}")
+                    
+                    logger.info("🔥 AGGRESSIVE DISCONNECT COMPLETED")
                     
                 except Exception as e:
-                    logger.warning(f"Error during client cleanup: {e}")
+                    logger.warning(f"Error during aggressive client cleanup: {e}")
+                    logger.info("🔥 Continuing with state reset despite cleanup errors")
             
             # Reset all state
             self.client = None
