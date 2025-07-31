@@ -149,9 +149,9 @@ function App() {
             return updated.slice(0, MAX_MESSAGES);
           });
           
-          // TTS for new messages
+          // TTS for new messages - add to queue instead of immediate playback
           if (data.tts_enabled && ttsEnabled) {
-            speak(data.message, data.user);
+            addToTTSQueue(data.message, data.user);
           }
           break;
           
