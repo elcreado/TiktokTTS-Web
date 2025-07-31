@@ -96,6 +96,14 @@ class TikTokTTSBotTester:
         """Test disconnect endpoint"""
         return self.run_test("Disconnect", "POST", "api/disconnect", 200)
 
+    def test_force_disconnect(self):
+        """Test force disconnect endpoint for stubborn connections"""
+        return self.run_test("Force Disconnect", "POST", "api/force-disconnect", 200)
+
+    def test_connection_details(self):
+        """Test connection details endpoint"""
+        return self.run_test("Connection Details", "GET", "api/connection-details", 200)
+
     def test_toggle_tts(self):
         """Test TTS toggle endpoint"""
         return self.run_test("Toggle TTS", "POST", "api/toggle-tts", 200)
