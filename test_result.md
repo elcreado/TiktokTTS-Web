@@ -177,11 +177,11 @@ frontend:
 
   - task: "Fix TTS queue interruption issue"
     implemented: true
-    working: true
+    working: "NA"
     file: "/app/frontend/src/App.js"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
         - working: "NA"
           agent: "main"
@@ -189,6 +189,12 @@ frontend:
         - working: true
           agent: "testing"
           comment: "✅ TTS QUEUE FUNCTIONALITY FULLY TESTED AND WORKING! Fixed critical backend dependency issues (httpx, betterproto) that were preventing startup. Comprehensive testing shows: 1) TTS Queue Management: Sequential processing working correctly - messages are processed one at a time without interruption, queue shows proper length (0-1), processing indicators work. 2) TTS Controls: Toggle functionality works (enable/disable), test button functional, proper API integration with backend. 3) Queue Behavior: Evidence of proper queue management - messages added to queue when TTS busy, processed sequentially using shift() for FIFO behavior, queue length updates in real-time. 4) Edge Cases: TTS disable during processing works correctly, rapid message handling prevents interruption. 5) Backend Integration: WebSocket connection established, real-time communication working, TTS operations properly logged. Console logs show detailed TTS queue operations: 'Adding message to queue', 'Processing TTS message', 'TTS processing finished'. The interruption issue has been resolved - TTS completes current message before starting next one. Queue maintains maximum 1 waiting message as designed. All test scenarios passed successfully."
+        - working: false
+          agent: "user"
+          comment: "User reported that TTS queue now prevents interruption (good) but messages are being duplicated - same message plays twice before completing. Need to fix message duplication bug."
+        - working: "NA"
+          agent: "main"
+          comment: "Investigating message duplication issue. Simplified speak() function to prevent duplicate event handlers, added detailed logging to addToTTSQueue and processTTSQueue to track message flow and identify where duplication occurs. Enhanced logging includes message IDs, queue state tracking, and detailed processing steps to debug the duplication problem."
 
 metadata:
   created_by: "main_agent"
