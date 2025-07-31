@@ -7,7 +7,7 @@ import websocket
 import threading
 
 class TikTokTTSBotTester:
-    def __init__(self, base_url="https://476652b0-7bf6-4a2a-8888-24e2f2a90189.preview.emergentagent.com"):
+    def __init__(self, base_url="https://67b4cdd9-922f-484b-838e-038308efe06e.preview.emergentagent.com"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
