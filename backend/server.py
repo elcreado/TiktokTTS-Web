@@ -86,12 +86,29 @@ class TikTokLiveBot:
             # Clean username (remove @ if present)
             clean_username = username.replace("@", "").strip()
             
-            # Initialize TikTok Live client
+            # Add SING_API_KEY to environment if provided
+            sing_api_key = "YzhhZDg5ZWEyMTE2ZDJjNGIyYmRhNjcwNGFkNWZlNmY3NjkxYmNmYTQzYzFmYzk5ZTNkYzI2"
+            
+            # Initialize TikTok Live client with enhanced configuration
             self.client = TikTokLiveClient(
                 unique_id=clean_username,
+                web_client_options={
+                    'signApiKey': sing_api_key,
+                    'fetchRoomInfoOnConnect': True,
+                    'enableExtendedGiftInfo': True,
+                    'requestPollingIntervalMs': 2000,
+                    'headers': {
+                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
+                    }
+                },
+                ws_options={
+                    'headers': {
+                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
+                    }
+                },
                 process_initial_data=False,
                 enable_extended_gift_info=True,
-                polling_interval_ms=1000
+                polling_interval_ms=2000
             )
             
             # Set up event handlers
