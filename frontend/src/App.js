@@ -126,22 +126,27 @@ function App() {
       id: Date.now() + Math.random()
     };
     
+    console.log(`📨 NEW MESSAGE RECEIVED: "${text}" by ${user} (ID: ${messageData.id})`);
+    console.log(`📊 Current state - isProcessingTTS: ${isProcessingTTS.current}, queueLength: ${ttsQueue.current.length}`);
+    
     if (isProcessingTTS.current) {
       // TTS is currently playing a message
       if (ttsQueue.current.length === 0) {
         // No message waiting, add this one to queue
-        console.log(`🎤 TTS is playing, adding message to queue: "${text}" by ${user}`);
+        console.log(`🎤 TTS is playing, adding message to queue: "${text}" by ${user} (ID: ${messageData.id})`);
         ttsQueue.current = [messageData];
         setTtsQueueLength(1);
       } else {
         // There's already a message waiting, replace it with the latest one
-        console.log(`🎤 TTS is playing and queue is full, replacing waiting message with latest: "${text}" by ${user}`);
+        console.log(`🎤 TTS is playing and queue is full, replacing waiting message with latest: "${text}" by ${user} (ID: ${messageData.id})`);
+        const oldMessage = ttsQueue.current[0];
+        console.log(`🗑️ Removing old waiting message: "${oldMessage.text}" by ${oldMessage.user} (ID: ${oldMessage.id})`);
         ttsQueue.current = [messageData]; // Replace the waiting message
         setTtsQueueLength(1);
       }
     } else {
       // TTS is not processing, start immediately
-      console.log(`🎤 Adding message to empty TTS queue and starting: "${text}" by ${user}`);
+      console.log(`🎤 Adding message to empty TTS queue and starting: "${text}" by ${user} (ID: ${messageData.id})`);
       ttsQueue.current = [messageData];
       setTtsQueueLength(1);
       processTTSQueue();
