@@ -233,8 +233,23 @@ function App() {
     };
   }, []);
 
+  // Auto-scroll functionality
+  const scrollToBottom = () => {
+    if (scrollAreaRef.current && shouldAutoScroll.current) {
+      const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollElement) {
+        setTimeout(() => {
+          scrollElement.scrollTo({
+            top: scrollElement.scrollHeight,
+            behavior: 'smooth'
+          });
+        }, 100);
+      }
+    }
+  };
+
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollToBottom();
   }, [chatMessages]);
 
   const getConnectionIcon = () => {
