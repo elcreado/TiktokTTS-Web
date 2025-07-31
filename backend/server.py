@@ -125,7 +125,8 @@ class TikTokLiveBot:
         @self.client.on(ConnectEvent)
         async def on_connect(event):
             self.is_connected = True
-            logger.info(f"Successfully connected to live stream!")
+            logger.info(f"✅ Successfully connected to live stream!")
+            logger.info(f"📡 Connection event details: {event}")
             
             await manager.broadcast(json.dumps({
                 "type": "connection_status",
