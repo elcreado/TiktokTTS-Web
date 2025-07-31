@@ -71,28 +71,38 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 # TikTok Live Integration
+from TikTokLive import TikTokLiveClient
+from TikTokLive.events import ConnectEvent, CommentEvent, DisconnectEvent, ViewerCountUpdateEvent
+
 class TikTokLiveBot:
     def __init__(self):
         self.client = None
         self.is_connected = False
         self.username = ""
+        self.connection_task = None
         
     async def connect_to_stream(self, username: str):
         try:
-            # This is a placeholder for TikTokLive integration
-            # We'll install the actual library next
-            self.username = username
-            self.is_connected = True
+            # Clean username (remove @ if present)
+            clean_username = username.replace("@", "").strip()
             
-            # Simulate connection success
-            await manager.broadcast(json.dumps({
-                "type": "connection_status",
-                "connected": True,
-                "username": username,
-                "timestamp": datetime.now().isoformat()
-            }))
+            # Initialize TikTok Live client
+            self.client = TikTokLiveClient(
+                unique_id=clean_username,
+                debug=True,
+                process_initial_data=False,
+                enable_extended_gift_info=True,
+                polling_interval_ms=1000
+            )
             
-            logger.info(f"Connected to @{username}'s live stream")
+            # Set up event handlers
+            self.setup_event_handlers()
+            
+            # Start connection in background
+            self.username = clean_username
+            self.connection_task = asyncio.create_task(self.start_client())
+            
+            logger.info(f"Attempting to connect to @{clean_username}'s live stream")
             return True
             
         except Exception as e:
@@ -105,10 +115,82 @@ class TikTokLiveBot:
             }))
             return False
     
+    def setup_event_handlers(self):
+        """Set up all TikTok Live event handlers"""
+        
+        @self.client.on(ConnectEvent)
+        async def on_connect(event: ConnectEvent):
+            self.is_connected = True
+            logger.info(f"Successfully connected to @{event.unique_id}'s live stream!")
+            
+            await manager.broadcast(json.dumps({
+                "type": "connection_status",
+                "connected": True,
+                "username": event.unique_id,
+                "timestamp": datetime.now().isoformat()
+            }))
+        
+        @self.client.on(CommentEvent)
+        async def on_comment(event: CommentEvent):
+            user = event.user.nickname if event.user else "Usuario Anónimo"
+            message = event.comment
+            
+            logger.info(f"💬 {user}: {message}")
+            await self.handle_chat_message(user, message)
+        
+        @self.client.on(ViewerCountUpdateEvent)
+        async def on_viewer_count_update(event: ViewerCountUpdateEvent):
+            logger.info(f"👥 Espectadores: {event.viewer_count}")
+            
+            await manager.broadcast(json.dumps({
+                "type": "viewer_count",
+                "count": event.viewer_count,
+                "timestamp": datetime.now().isoformat()
+            }))
+        
+        @self.client.on(DisconnectEvent)
+        async def on_disconnect(event: DisconnectEvent):
+            self.is_connected = False
+            logger.info("Disconnected from TikTok live stream")
+            
+            await manager.broadcast(json.dumps({
+                "type": "connection_status",
+                "connected": False,
+                "username": "",
+                "timestamp": datetime.now().isoformat()
+            }))
+    
+    async def start_client(self):
+        """Start the TikTok Live client"""
+        try:
+            if self.client:
+                await self.client.connect()
+        except Exception as e:
+            logger.error(f"Error starting TikTok client: {e}")
+            self.is_connected = False
+            
+            await manager.broadcast(json.dumps({
+                "type": "connection_status",
+                "connected": False,
+                "error": f"No se pudo conectar al live de @{self.username}. Verifica que esté transmitiendo en vivo.",
+                "timestamp": datetime.now().isoformat()
+            }))
+    
     async def disconnect_from_stream(self):
         try:
+            if self.client:
+                await self.client.disconnect()
+            
+            if self.connection_task:
+                self.connection_task.cancel()
+                try:
+                    await self.connection_task
+                except asyncio.CancelledError:
+                    pass
+            
             self.is_connected = False
             self.username = ""
+            self.client = None
             
             await manager.broadcast(json.dumps({
                 "type": "connection_status",
@@ -140,13 +222,16 @@ class TikTokLiveBot:
         await manager.broadcast(json.dumps(chat_data))
         
         # Store in database
-        await db.chat_messages.insert_one({
-            "id": str(uuid.uuid4()),
-            "user": user,
-            "message": message,
-            "timestamp": datetime.now(),
-            "username_stream": self.username
-        })
+        try:
+            await db.chat_messages.insert_one({
+                "id": str(uuid.uuid4()),
+                "user": user,
+                "message": message,
+                "timestamp": datetime.now(),
+                "username_stream": self.username
+            })
+        except Exception as e:
+            logger.error(f"Error saving message to database: {e}")
         
         logger.info(f"Chat message from {user}: {message}")
 
