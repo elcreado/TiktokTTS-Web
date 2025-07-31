@@ -213,25 +213,26 @@ class TikTokLiveBot:
                 except Exception as fallback_error:
                     logger.error(f"💥 Fallback comment processing also failed: {fallback_error}")
         
-        # Let's also try capturing other events that might contain messages
-        @self.client.on("comment")
-        async def on_comment_string(event):
-            try:
-                logger.info(f"🎯 String-based comment event: {type(event)}")
-                logger.info(f"🎯 Event: {event}")
-                await self.handle_chat_message("Usuario (String Event)", str(event))
-            except Exception as e:
-                logger.error(f"💥 Error in string comment handler: {e}")
+        # Note: String-based event handlers cause 'str' object has no attribute 'get_type' error in TikTokLive 6.5.2
+        # Only use event class-based handlers like CommentEvent, ConnectEvent, etc.
+        # Commenting out string-based handlers until library issue is resolved
+        # @self.client.on("comment")
+        # async def on_comment_string(event):
+        #     try:
+        #         logger.info(f"🎯 String-based comment event: {type(event)}")
+        #         logger.info(f"🎯 Event: {event}")
+        #         await self.handle_chat_message("Usuario (String Event)", str(event))
+        #     except Exception as e:
+        #         logger.error(f"💥 Error in string comment handler: {e}")
         
-        # Try to capture any event that might be related to messages
-        @self.client.on("live_comment")
-        async def on_live_comment(event):
-            try:
-                logger.info(f"📝 Live comment event: {type(event)}")
-                logger.info(f"📝 Event: {event}")
-                await self.handle_chat_message("Usuario (Live Comment)", str(event))
-            except Exception as e:
-                logger.error(f"💥 Error in live comment handler: {e}")
+        # @self.client.on("live_comment")
+        # async def on_live_comment(event):
+        #     try:
+        #         logger.info(f"📝 Live comment event: {type(event)}")
+        #         logger.info(f"📝 Event: {event}")
+        #         await self.handle_chat_message("Usuario (Live Comment)", str(event))
+        #     except Exception as e:
+        #         logger.error(f"💥 Error in live comment handler: {e}")
         
         @self.client.on(DisconnectEvent)
         async def on_disconnect(event):
