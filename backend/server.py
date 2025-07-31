@@ -375,6 +375,63 @@ async def disconnect_tiktok():
     else:
         raise HTTPException(status_code=500, detail="Failed to disconnect")
 
+@app.post("/api/force-disconnect")
+async def force_disconnect_tiktok():
+    """Force disconnect endpoint for stubborn connections"""
+    global current_username
+    
+    try:
+        logger.info("Force disconnect requested - performing aggressive cleanup")
+        
+        # Reset global state immediately
+        current_username = ""
+        
+        # Force reset the bot state without waiting
+        tiktok_bot.is_connected = False
+        tiktok_bot.username = ""
+        
+        # Cancel tasks forcefully
+        if tiktok_bot.connection_task and not tiktok_bot.connection_task.done():
+            tiktok_bot.connection_task.cancel()
+        
+        # Set client to None
+        tiktok_bot.client = None
+        tiktok_bot.connection_task = None
+        
+        # Force garbage collection
+        import gc
+        gc.collect()
+        
+        # Broadcast forced disconnection
+        await manager.broadcast(json.dumps({
+            "type": "connection_status", 
+            "connected": False,
+            "username": "",
+            "message": "Desconexión forzada completada",
+            "timestamp": datetime.now().isoformat()
+        }))
+        
+        logger.info("Force disconnect completed successfully")
+        return {"success": True, "message": "Force disconnected from TikTok live"}
+        
+    except Exception as e:
+        logger.error(f"Error in force disconnect: {e}")
+        return {"success": True, "message": "Force disconnect attempted - state reset"}
+
+@app.get("/api/connection-details")
+async def get_connection_details():
+    """Get detailed connection information for debugging"""
+    return {
+        "is_connected": tiktok_bot.is_connected,
+        "username": tiktok_bot.username,
+        "current_username": current_username,
+        "has_client": tiktok_bot.client is not None,
+        "has_connection_task": tiktok_bot.connection_task is not None,
+        "task_done": tiktok_bot.connection_task.done() if tiktok_bot.connection_task else None,
+        "tts_enabled": tts_enabled,
+        "timestamp": datetime.now().isoformat()
+    }
+
 @app.post("/api/toggle-tts")
 async def toggle_tts():
     global tts_enabled
