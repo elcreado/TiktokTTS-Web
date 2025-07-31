@@ -205,14 +205,16 @@ function App() {
     
     // Clear the queue
     ttsQueue.current = [];
+    setTtsQueueLength(0);
     
     // Cancel any ongoing speech
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
     
-    // Reset processing flag
+    // Reset processing flags
     isProcessingTTS.current = false;
+    setIsProcessingTTSState(false);
     
     console.log('TTS queue cleared and speech stopped');
   };
